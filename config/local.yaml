@@ -1,0 +1,9 @@
+project_name: "continual_mt_olora"
+model_name: "facebook/nllb-200-distilled-600M" # Backbone dịch máy siêu nhẹ
+cache_dir: "./models"
+learning_rate: 0.0003
+lora_rank: 16
+batch_size: 1          # An toàn tuyệt đối cho 4GB VRAM
+fast_dev_run: True     # Test lẹ 1 batch rồi nghỉ, không lưu model
+max_epochs: 1
+num_sample: 1000              # Lấy mẫu 1000 câu để test, không train hết dataset

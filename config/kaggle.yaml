@@ -1,0 +1,9 @@
+project_name: "continual_mt_olora"
+model_name: "facebook/nllb-200-distilled-600M" # Backbone dịch máy siêu nhẹ
+cache_dir: "./models"
+learning_rate: 0.0003
+lora_rank: 16
+batch_size: 16         # GPU 16GB của Kaggle nuốt vô tư
+fast_dev_run: False    # Tắt chế độ test, train thật sự!
+max_epochs: 10         # Train nhiều epoch
+num_sample: 1000              # Lấy mẫu 1000 câu để test, không train hết dataset

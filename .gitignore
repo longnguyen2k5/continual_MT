@@ -1,6 +1,10 @@
 __pycache__/
 *.pyc
-/data/
+data/
 /wandb/
+/models
 .env
 .vscode
+checkpoints/
+domain_shift_tsne.png
+seq_len_histogram.png
