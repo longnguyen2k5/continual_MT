@@ -152,6 +152,8 @@ class NormalMTModel(pl.LightningModule):
     @torch.no_grad()
     def translate_sentence(self, text): 
         self.model.eval()
+        self.model.to(torch.bfloat16)
+        
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
         outputs = self.model.generate(**inputs, max_length=self.max_length, forced_bos_token_id=self.vi_token_id)
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
