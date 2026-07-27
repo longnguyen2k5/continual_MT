@@ -44,6 +44,7 @@ class NormalMTModel(pl.LightningModule):
 
         print("Tên các loại lớp Linear bạn có thể dùng làm target_modules:")
         print(list(linear_layers))
+        return base_model
               
     # ===========================
     # 
@@ -65,7 +66,7 @@ class NormalMTModel(pl.LightningModule):
             if param.requires_grad:
                 trainable_params += param.numel()
         
-        print(
+        print(  
             f"🎯 Trainable params: {trainable_params:,} || "
             f"All params: {all_param:,} || "
             f"Trainable%: {100 * trainable_params / all_param:.4f}%"
