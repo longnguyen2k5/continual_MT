@@ -7,3 +7,4 @@ batch_size: 1          # An toàn tuyệt đối cho 4GB VRAM
 fast_dev_run: True     # Test lẹ 1 batch rồi nghỉ, không lưu model
 max_epochs: 1
 num_sample: 1000              # Lấy mẫu 1000 câu để test, không train hết dataset
+num_test_sample: 100
