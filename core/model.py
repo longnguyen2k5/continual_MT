@@ -1,4 +1,3 @@
-from anyio.lowlevel import checkpoint
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq
 import torch
 import pytorch_lightning as pl
@@ -11,20 +10,31 @@ import torch.nn as nn
 class NormalMTModel(pl.LightningModule): 
     def __init__(self, config, tokenizer): 
         super().__init__()
-        self.lr = config["learning_rate"]
+        self.lr = config.get("learning_rate", 0.0003)
+        self.ortho_weight = config.get("orthogonal_loss_weight", 0.1)
         self.tokenizer = tokenizer
-        self.best_bleu_score = -1.0
         self.current_task_name = 'unk'
+        self.vi_token_id = self.tokenizer.convert_tokens_to_ids('vie_Latn')
+        self.checkpoint_path = config.get("checkpoint_path", "./checkpoints")
+        self.max_length = config.get("max_length", 128)
+        base_model = self._build_base_model(config)
+        self.model = inject_continual_lora(base_model, 
+                                           method='oliera', 
+                                           r=config['lora_rank'], 
+                                           target_modules=config.get('target_modules', ['q_proj', 'v_proj']))
         
+        self.print_trainable_parameters()
+        
+    def _build_base_model(self, config): 
         base_model = AutoModelForSeq2SeqLM.from_pretrained(
             config['model_name'], 
             cache_dir=config['cache_dir'],
             use_safetensors=True,
             torch_dtype=torch.bfloat16
         )
-        
         base_model.gradient_checkpointing_enable()
-        
+        for param in base_model.parameters():
+            param.requires_grad = False
         linear_layers = set()
         for name, module in base_model.named_modules():
             if isinstance(module, nn.Linear):
@@ -34,15 +44,10 @@ class NormalMTModel(pl.LightningModule):
 
         print("Tên các loại lớp Linear bạn có thể dùng làm target_modules:")
         print(list(linear_layers))
-        
-        for param in base_model.parameters():
-            param.requires_grad = False
-        
-        self.model = inject_continual_lora(base_model, method='oliera', r=config['lora_rank'], target_modules=["q_proj", "v_proj"])
-        
-        self.print_trainable_parameters()
-        
-        
+              
+    # ===========================
+    # 
+    # ===========================  
     def add_new_task(self): 
         count = 0
         for name, module in self.model.named_modules(): 
@@ -76,10 +81,16 @@ class NormalMTModel(pl.LightningModule):
         loss = outputs.loss
         loss_ortho = get_total_orthogonal_loss(self.model)
         
-        total_loss = loss + 0.01 * loss_ortho  # Cộng thêm orthogonal loss với trọng số 0.01
+        total_loss = loss + self.ortho_weight * loss_ortho  
         self.log("train_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return total_loss
     
+    def on_train_end(self):
+        """Hàm này chỉ chạy 1 lần duy nhất khi kết thúc toàn bộ max_epochs"""
+        print(f"\n🏁 Đã kết thúc huấn luyện cho task '{self.current_task_name}'. Đang lưu Final Checkpoint...")
+        save_dir = self.checkpoint_path
+        self.save_smart_checkpoint(save_dir, self.current_task_name)
+        
     def configure_optimizers(self):
         trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
         return torch.optim.AdamW(trainable_params, lr=self.lr)
@@ -90,12 +101,11 @@ class NormalMTModel(pl.LightningModule):
         
     @torch.no_grad()
     def validation_step(self, batch, batch_idx): 
-        vi_token_id = self.tokenizer.convert_tokens_to_ids('vie_Latn')
         generated_tokens = self.model.generate(
             input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"],
-            max_length=128,
-            forced_bos_token_id=vi_token_id
+            max_length=self.max_length,
+            forced_bos_token_id=self.vi_token_id
         )
         labels = batch['labels']
         labels = torch.where(labels != -100, labels, self.tokenizer.pad_token_id)
@@ -118,11 +128,6 @@ class NormalMTModel(pl.LightningModule):
         self.log("val_bleu", bleu, prog_bar=True, logger=True)
         print(f"\n🏆 [Epoch {self.current_epoch}] ĐIỂM BLEU: {bleu:.2f}\n")
         
-        if bleu > self.best_bleu_score:
-            self.best_bleu_score = bleu
-            save_dir = "./checkpoints"
-            self.save_smart_checkpoint(save_dir, self.current_task_name)
-            
         self.val_preds.clear()
         self.val_refs.clear()
         
@@ -147,7 +152,7 @@ class NormalMTModel(pl.LightningModule):
     def translate_sentence(self, text): 
         self.model.eval()
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
-        outputs = self.model.generate(**inputs, max_length=128, forced_bos_token_id=self.tokenizer.convert_tokens_to_ids('vie_Latn'))
+        outputs = self.model.generate(**inputs, max_length=self.max_length, forced_bos_token_id=self.vi_token_id)
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
     
     def save_smart_checkpoint(self, save_dir, task_name):

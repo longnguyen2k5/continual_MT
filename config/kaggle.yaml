@@ -8,3 +8,8 @@ fast_dev_run: False    # Tắt chế độ test, train thật sự!
 max_epochs: 10         # Train nhiều epoch
 num_sample: 1000              # Lấy mẫu 1000 câu để test, không train hết dataset
 num_test_sample: 100
+orthogonal_loss_weight: 0.1
+target_modules: 
+  - "q_proj"
+  - "v_proj"
+max_length: 128
