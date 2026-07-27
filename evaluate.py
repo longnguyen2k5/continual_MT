@@ -35,6 +35,7 @@ def evaluate(config_path, checkpoint_path):
     
     trainer = pl.Trainer(
         accelerator="auto",
+        devices=1,
         logger=False,
         precision='bf16-mixed'
     )
@@ -56,7 +57,7 @@ def evaluate(config_path, checkpoint_path):
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate Continual Machine Translation Model")
-    parser.add_argument("--config", type=str, default="configs/local.yaml", help="Path to the config file")
+    parser.add_argument("--config", type=str, default="config/local.yaml", help="Path to the config file")
     parser.add_argument("--checkpoint", type=str, default=None, help="Path to the model checkpoint")
     args = parser.parse_args()
     
