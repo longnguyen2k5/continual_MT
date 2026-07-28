@@ -26,7 +26,6 @@ class ContinualLoRABase(nn.Module):
         self.register_buffer(
             'cache_history_delta_w', 
             torch.zeros(self.out_features, self.in_features))
-        
         self.reset_parameters()
         
     def reset_parameters(self): 
@@ -34,20 +33,20 @@ class ContinualLoRABase(nn.Module):
         nn.init.zeros_(self.B_curr)
         
     def add_task(self): 
+        with torch.no_grad(): 
+                current_delta = torch.mm(self.B_curr, self.A_curr) # out_features * in_features
+                self.cache_history_delta_w += current_delta
         self.A_curr.requires_grad = False
         self.B_curr.requires_grad = False
         
-        with torch.no_grad(): 
-            current_delta = torch.mm(self.B_curr, self.A_curr) # out_features * in_features
-            self.cache_history_delta_w += current_delta
+        A_old = nn.Parameter(self.A_curr.data.clone(), requires_grad=False)
+        B_old = nn.Parameter(self.B_curr.data.clone(), requires_grad=False)
             
-        self.history_A.append(self.A_curr)
-        self.history_B.append(self.B_curr)
+        self.history_A.append(A_old)
+        self.history_B.append(B_old)
         
-        device=self.weight.device
-        self.A_curr = nn.Parameter(torch.empty(self.r, self.in_features, device=device))
-        self.B_curr = nn.Parameter(torch.empty(self.out_features, self.r, device=device))
-        self.reset_parameters()
+        with torch.no_grad(): 
+            self.reset_parameters()
         
         
     def get_orthogonal_loss(self): 

@@ -161,18 +161,41 @@ class NormalMTModel(pl.LightningModule):
     
     def save_smart_checkpoint(self, save_dir, task_name):
         os.makedirs(save_dir, exist_ok=True)
-        trainable_state_dict = {k: v for k, v in self.model.named_parameters() if v.requires_grad}
+        full_state_dict = self.model.state_dict()
+        lora_keys = [
+            "A_curr", 
+            "B_curr", 
+            "history_A", 
+            "history_B", 
+            "cache_history_delta_w"
+        ]
+        lora_state_dict = {
+            k: v for k, v in full_state_dict.items() 
+            if any(lora_key in k for lora_key in lora_keys)
+        }
         save_path = os.path.join(save_dir, f"checkpoint_{task_name}.pt")
-        torch.save(trainable_state_dict, save_path)
-        print(f"💾 Đã lưu trọng số LoRA của task '{task_name}' tại: {save_path}")
+        torch.save(lora_state_dict, save_path)
+        print(f"💾 Đã lưu trọng số LoRA và Memory (History, Cache) của task '{task_name}' tại: {save_path}")
         
     def load_smart_checkpoint(self, checkpoint_path): 
         if not os.path.exists(checkpoint_path):
             raise FileNotFoundError(f"⚠️ Không tìm thấy checkpoint tại: {checkpoint_path}")
         
         lora_state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+        num_histories = 0
+        for key in lora_state_dict.keys():
+            if 'history_A.' in key:
+                idx = int(key.split('history_A.')[-1].split('.')[0])
+                num_histories = max(num_histories, idx + 1)
+        if num_histories > 0:
+            for module in self.model.modules():
+                if isinstance(module, ContinualLoRABase):
+                    while len(module.history_A) < num_histories:
+                        # Thêm ô trống, không cần requires_grad
+                        module.history_A.append(nn.Parameter(torch.empty(module.r, module.in_features), requires_grad=False))
+                        module.history_B.append(nn.Parameter(torch.empty(module.out_features, module.r), requires_grad=False))
         missing_keys, unexpected_keys = self.model.load_state_dict(lora_state_dict, strict=False)
-        print("✅ Đã nạp thành công!")
-        if unexpected_keys:
-            print(f"⚠️ Cảnh báo - Có các key không khớp (thừa): {unexpected_keys}")
-            
+        print("✅ Đã nạp thành công Checkpoint OLieRA!")
+        real_unexpected = [k for k in unexpected_keys if 'history' not in k]
+        if real_unexpected:
+            print(f"⚠️ Cảnh báo - Có các key lạ không khớp: {real_unexpected}")
