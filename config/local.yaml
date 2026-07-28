@@ -13,3 +13,4 @@ target_modules:
   - "q_proj"
   - "v_proj"
 max_length: 128
+lora_alpha: 1

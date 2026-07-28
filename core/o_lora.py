@@ -4,12 +4,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class ContinualLoRABase(nn.Module): 
-    def __init__(self, base_layer: nn.Linear, r: int=16, lora_alpha: int=16): 
+    def __init__(self, base_layer: nn.Linear, r: int=16, lora_alpha: int=1): 
         super().__init__()
         self.in_features = base_layer.in_features
         self.out_features = base_layer.out_features
         self.r = r
-        self.scaling = lora_alpha / math.sqrt(r)
+        self.scaling = lora_alpha / r 
         
         self.weight = nn.Parameter(base_layer.weight.data, requires_grad=False)
         if base_layer.bias is not None: 
@@ -30,7 +30,7 @@ class ContinualLoRABase(nn.Module):
         self.reset_parameters()
         
     def reset_parameters(self): 
-        nn.init.kaiming_uniform_(self.A_curr, a=math.sqrt(5))
+        nn.init.normal_(self.A_curr, mean=0.0, std=0.02)
         nn.init.zeros_(self.B_curr)
         
     def add_task(self): 
@@ -83,16 +83,16 @@ class OLieRaLinear(ContinualLoRABase):
         w_active = self.weight * scale_factor # out_features * in_features
         return F.linear(x, w_active, self.bias)
     
-def inject_continual_lora(model: nn.Module, method: str = 'oliera', r: int = 16, target_modules: list = ['q_proj', 'v_proj']): 
+def inject_continual_lora(model: nn.Module, method: str = 'oliera', r: int = 16, lora_alpha: int = 1, target_modules: list = ['q_proj', 'v_proj']): 
     for name, module in model.named_children(): 
         if isinstance(module, nn.Linear) and any(target in name for target in target_modules):
             TargetClass = OLieRaLinear if method == 'oliera' else OLoRALinear
-            new_layer = TargetClass(module, r=r)
+            new_layer = TargetClass(module, r=r, lora_alpha=lora_alpha)
             
             setattr(model, name, new_layer)
         
         else: 
-            inject_continual_lora(module, method=method, r=r, target_modules=target_modules)
+            inject_continual_lora(module, method=method, r=r, lora_alpha=lora_alpha, target_modules=target_modules)
             
     return model
 

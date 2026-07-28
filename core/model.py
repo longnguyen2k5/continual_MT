@@ -21,6 +21,7 @@ class NormalMTModel(pl.LightningModule):
         self.model = inject_continual_lora(base_model, 
                                            method='oliera', 
                                            r=config['lora_rank'], 
+                                           lora_alpha=config['lora_alpha'],
                                            target_modules=config.get('target_modules', ['q_proj', 'v_proj']))
         
         self.print_trainable_parameters()
