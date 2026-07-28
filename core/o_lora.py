@@ -47,6 +47,9 @@ class ContinualLoRABase(nn.Module):
         
         with torch.no_grad(): 
             self.reset_parameters()
+            
+        self.A_curr.requires_grad = True
+        self.B_curr.requires_grad = True
         
         
     def get_orthogonal_loss(self): 
