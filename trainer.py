@@ -48,8 +48,9 @@ def main(config_path):
         trainer = pl.Trainer(
             fast_dev_run=config.get("fast_dev_run", False),
             max_epochs=config.get("max_epochs", 3),
-            accelerator="auto",
-            precision='bf16-mixed'
+            accelerator="gpu",
+            devices=1,
+            precision='16-mixed'
         )   
         
         validate_datalist = get_domain_data(domain_name, split_type='validation', num_sample=config.get("num_sample", None))
