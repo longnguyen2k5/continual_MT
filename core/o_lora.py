@@ -9,7 +9,7 @@ class ContinualLoRABase(nn.Module):
         self.in_features = base_layer.in_features
         self.out_features = base_layer.out_features
         self.r = r
-        self.scaling = lora_alpha / r 
+        self.scaling = lora_alpha / math.sqrt(r)
         
         self.weight = nn.Parameter(base_layer.weight.data, requires_grad=False)
         if base_layer.bias is not None: 
