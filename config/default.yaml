@@ -1,0 +1,7 @@
+project_name: "continual_mt_olora"
+model_name: "facebook/nllb-200-distilled-600M" # Backbone dịch máy siêu nhẹ
+cache_dir: "./models"
+learning_rate: 0.0003
+batch_size: 16
+epochs_per_task: 3
+lora_rank: 16
