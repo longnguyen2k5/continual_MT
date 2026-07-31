@@ -16,4 +16,4 @@ target_modules:
   - "fc2"              # THÊM: Mở khóa lớp Fully Connected 2
   - "out_proj"         # THÊM: Mở khóa lớp Output Projection
 max_length: 128
-lora_alpha: 1
+lora_alpha: 4
