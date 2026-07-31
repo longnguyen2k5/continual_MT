@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, get_cosine_schedule_with_warmup
 import torch
 import pytorch_lightning as pl
 from core.o_lora import inject_continual_lora, get_total_orthogonal_loss, ContinualLoRABase
@@ -95,8 +95,24 @@ class NormalMTModel(pl.LightningModule):
         
     def configure_optimizers(self):
         trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
-        return torch.optim.AdamW(trainable_params, lr=self.lr)
-    
+        optimizer = torch.optim.AdamW(trainable_params, lr=self.lr)
+        total_steps = self.trainer.estimated_stepping_batches
+        warmup_steps = int(total_steps * 0.05)  # 5% warmup
+        
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer, 
+            num_warmup_steps=warmup_steps, 
+            num_training_steps=total_steps
+        )
+        
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",
+                "frequency": 1
+            }
+        }
     def on_validation_epoch_start(self): 
         self.val_preds = [] 
         self.val_refs = []
