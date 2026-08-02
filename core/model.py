@@ -19,7 +19,7 @@ class NormalMTModel(pl.LightningModule):
         self.max_length = config.get("max_length", 128)
         base_model = self._build_base_model(config)
         self.model = inject_continual_lora(base_model, 
-                                           method='oliera', 
+                                           method=config.get('lora_method', 'olora'),
                                            r=config['lora_rank'], 
                                            lora_alpha=config['lora_alpha'],
                                            target_modules=config.get('target_modules', ['q_proj', 'v_proj']))
@@ -27,12 +27,20 @@ class NormalMTModel(pl.LightningModule):
         self.print_trainable_parameters()
         
     def _build_base_model(self, config): 
+        dtype_map = {
+            '16-mixed': torch.float16,
+            '32-true': torch.float32,
+            'bf16-mixed': torch.bfloat16
+        }
+        dtype = dtype_map.get(config.get('precision', '16-mixed'), torch.float16)
+        
         base_model = AutoModelForSeq2SeqLM.from_pretrained(
             config['model_name'], 
             cache_dir=config['cache_dir'],
             use_safetensors=True,
-            torch_dtype=torch.bfloat16
+            torch_dtype=dtype
         )
+        
         base_model.gradient_checkpointing_enable()
         for param in base_model.parameters():
             param.requires_grad = False
@@ -169,8 +177,6 @@ class NormalMTModel(pl.LightningModule):
     @torch.no_grad()
     def translate_sentence(self, text): 
         self.model.eval()
-        self.model.to(torch.bfloat16)
-        
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
         outputs = self.model.generate(**inputs, max_length=self.max_length, forced_bos_token_id=self.vi_token_id)
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]

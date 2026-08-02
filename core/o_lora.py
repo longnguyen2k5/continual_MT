@@ -2,40 +2,23 @@ import math
 import torch 
 import torch.nn as nn 
 import torch.nn.functional as F
+from core.base_lora import LoRABase
 
-class ContinualLoRABase(nn.Module): 
-    def __init__(self, base_layer: nn.Linear, r: int=16, lora_alpha: int=1): 
-        super().__init__()
-        self.in_features = base_layer.in_features
-        self.out_features = base_layer.out_features
-        self.r = r
-        self.scaling = lora_alpha / math.sqrt(r)
-        
-        self.weight = nn.Parameter(base_layer.weight.data, requires_grad=False)
-        if base_layer.bias is not None: 
-            self.bias = nn.Parameter(base_layer.bias.data, requires_grad=False)
-        else: 
-            self.register_buffer('bias', None)
-            
+class ContinualLoRABase(LoRABase): 
+    def __init__(self, base_layer: nn.Linear, r: int=16, lora_alpha: int=1, init_strategy: str='kaiming'): 
+        super().__init__(base_layer, r=r, lora_alpha=lora_alpha, init_strategy=init_strategy)
         self.history_A = nn.ParameterList()
         self.history_B = nn.ParameterList()
-        
-        self.A_curr = nn.Parameter(torch.empty(self.r, self.in_features))
-        self.B_curr = nn.Parameter(torch.empty(self.out_features, self.r))
         
         self.register_buffer(
             'cache_history_delta_w', 
             torch.zeros(self.out_features, self.in_features))
         self.reset_parameters()
         
-    def reset_parameters(self): 
-        nn.init.normal_(self.A_curr, mean=0.0, std=0.02)
-        nn.init.zeros_(self.B_curr)
-        
     def add_task(self): 
         with torch.no_grad(): 
-                current_delta = torch.mm(self.B_curr, self.A_curr) # out_features * in_features
-                self.cache_history_delta_w += current_delta
+            current_delta = torch.mm(self.B_curr, self.A_curr) # out_features * in_features
+            self.cache_history_delta_w += current_delta
         self.A_curr.requires_grad = False
         self.B_curr.requires_grad = False
         
@@ -63,21 +46,20 @@ class ContinualLoRABase(nn.Module):
             
             M_B = torch.mm(B_old.T, self.B_curr) # r * r
             loss += torch.sum(torch.square(M_B))
-            
         return loss
     
-    def compute_delta_w(self): 
-        delta_w = torch.mm(self.B_curr, self.A_curr) # out_features * in_features
-        return (self.cache_history_delta_w + delta_w) * self.scaling
-    
-
 class OLoRALinear(ContinualLoRABase): 
+    def __init__(self, base_layer: nn.Linear , r: int=16, lora_alpha: int=1, init_strategy: str='kaiming'): 
+        super().__init__(base_layer, r=r, lora_alpha=lora_alpha, init_strategy=init_strategy)
     def forward(self, x: torch.Tensor):
         delta_w = self.compute_delta_w() # out_features * in_features
         w_active = self.weight + delta_w # out_features * in_features
         return F.linear(x, w_active, self.bias)
     
 class OLieRaLinear(ContinualLoRABase): 
+    def __init__(self, base_layer: nn.Linear , r: int=16, lora_alpha: int=1, init_strategy: str='normal'): 
+        super().__init__(base_layer, r=r, lora_alpha=lora_alpha, init_strategy=init_strategy)
+        
     def forward(self, x: torch.Tensor): 
         delta_w = self.compute_delta_w() # out_features * in_features
         

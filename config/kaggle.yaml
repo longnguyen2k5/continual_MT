@@ -17,3 +17,8 @@ target_modules:
   - "out_proj"         # THÊM: Mở khóa lớp Output Projection
 max_length: 128
 lora_alpha: 4
+mole_config:
+  router_type: "softmax"        # "softmax", "dirichlet", hoặc "task_id"
+  router_loss_weight: 0.01      # Hệ số phạt nếu Router dồn việc cho 1 chuyên gia
+precision: '16-mixed' # '16-mixed' | '32-true' | 'bf16-mixed' 
+lora_method: 'olora' # olora | oliera

@@ -50,7 +50,7 @@ def main(config_path):
             max_epochs=config.get("max_epochs", 3),
             accelerator="gpu",
             devices=1,
-            precision='16-mixed'
+            precision=config.get("precision", '16-mixed'),  # '16-mixed' | '32-true' | 'bf16-mixed'
         )   
         
         validate_datalist = get_domain_data(domain_name, split_type='validation', num_sample=config.get("num_sample", None))
