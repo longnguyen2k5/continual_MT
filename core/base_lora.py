@@ -51,7 +51,7 @@ class LoRABase(nn.Module):
         else: 
             raise ValueError(f"Unknown init_strategy: {self.init_strategy}")
         
-    def compute_delta_weight(self): 
+    def compute_delta_w(self): 
         return torch.mm(self.B_curr, self.A_curr) * self.scaling
     
  
