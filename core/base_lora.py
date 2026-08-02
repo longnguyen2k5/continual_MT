@@ -21,8 +21,8 @@ class LoRABase(nn.Module):
         else: 
             self.register_buffer('bias', None)
         
-        self.A_curr = nn.Parameter(torch.empty(self.r, self.in_features), dtype=self.target_dtype)
-        self.B_curr = nn.Parameter(torch.empty(self.out_features, self.r), dtype=self.target_dtype)
+        self.A_curr = nn.Parameter(torch.empty(self.r, self.in_features, dtype=self.target_dtype))
+        self.B_curr = nn.Parameter(torch.empty(self.out_features, self.r, dtype=self.target_dtype))
         self.reset_parameters()
         
     def reset_parameters(self):

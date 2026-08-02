@@ -12,7 +12,7 @@ class ContinualLoRABase(LoRABase):
         
         self.register_buffer(
             'cache_history_delta_w', 
-            torch.zeros(self.out_features, self.in_features))
+            torch.zeros(self.out_features, self.in_features, dtype=self.target_dtype))
         self.reset_parameters()
         
     def add_task(self): 
