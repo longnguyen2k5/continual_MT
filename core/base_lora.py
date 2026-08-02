@@ -21,8 +21,8 @@ class LoRABase(nn.Module):
         else: 
             self.register_buffer('bias', None)
         
-        self.A_curr = nn.Parameter(torch.empty(self.r, self.in_features, dtype=self.target_dtype))
-        self.B_curr = nn.Parameter(torch.empty(self.out_features, self.r, dtype=self.target_dtype))
+        self.A_curr = nn.Parameter(torch.empty(self.r, self.in_features))
+        self.B_curr = nn.Parameter(torch.empty(self.out_features, self.r))
         self.reset_parameters()
         
     def reset_parameters(self):
@@ -40,7 +40,7 @@ class LoRABase(nn.Module):
         elif self.init_strategy == 'pissa': 
             with torch.no_grad(): 
                 U, S, V = torch.svd_lowrank(self.weight.data, q=self.r, niter=2)
-                S_diag = torch.diag(S)
+                S_diag = torch.diag(S) / self.scaling
                 sqrt_S = torch.sqrt(S_diag)
                 
                 self.A_curr.data = torch.mm(sqrt_S, V.t())
@@ -52,8 +52,8 @@ class LoRABase(nn.Module):
         else: 
             raise ValueError(f"Unknown init_strategy: {self.init_strategy}")
         
-    def compute_delta_w(self): 
-        return torch.mm(self.B_curr, self.A_curr) * self.scaling
-    
- 
+        self.num_reset += 1
         
+    def compute_delta_w(self): 
+        delta_w = torch.mm(self.B_curr, self.A_curr) * self.scaling
+        return delta_w.to(self.target_dtype)

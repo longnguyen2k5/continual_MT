@@ -12,13 +12,13 @@ class ContinualLoRABase(LoRABase):
         
         self.register_buffer(
             'cache_history_delta_w', 
-            torch.zeros(self.out_features, self.in_features, dtype=self.target_dtype))
+            torch.zeros(self.out_features, self.in_features))
         self.reset_parameters()
         
     def add_task(self): 
         with torch.no_grad(): 
             current_delta = torch.mm(self.B_curr, self.A_curr) # out_features * in_features
-            self.cache_history_delta_w += current_delta
+            self.cache_history_delta_w += current_delta.to(self.target_dtype)
         self.A_curr.requires_grad = False
         self.B_curr.requires_grad = False
         
@@ -47,6 +47,11 @@ class ContinualLoRABase(LoRABase):
             M_B = torch.mm(B_old.T, self.B_curr) # r * r
             loss += torch.sum(torch.square(M_B))
         return loss
+    
+    def compute_delta_w(self): 
+        delta_w = torch.mm(self.B_curr, self.A_curr)
+        total_delta_w = (delta_w + self.cache_history_delta_w) * self.scaling
+        return total_delta_w.to(self.target_dtype)
     
 class OLoRALinear(ContinualLoRABase): 
     def __init__(self, base_layer: nn.Linear , r: int=16, lora_alpha: int=1, init_strategy: str='kaiming'): 
