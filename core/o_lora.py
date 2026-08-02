@@ -57,7 +57,7 @@ class OLoRALinear(ContinualLoRABase):
         return F.linear(x, w_active, self.bias)
     
 class OLieRaLinear(ContinualLoRABase): 
-    def __init__(self, base_layer: nn.Linear , r: int=16, lora_alpha: int=1, init_strategy: str='normal'): 
+    def __init__(self, base_layer: nn.Linear , r: int=16, lora_alpha: int=1, init_strategy: str='pissa'): 
         super().__init__(base_layer, r=r, lora_alpha=lora_alpha, init_strategy=init_strategy)
         
     def forward(self, x: torch.Tensor): 
