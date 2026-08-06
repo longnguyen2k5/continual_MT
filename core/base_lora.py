@@ -14,7 +14,7 @@ class LoRABase(nn.Module):
         self.target_dtype = base_layer.weight.dtype
         
         self.init_strategy = init_strategy
-        self.num_reset = 0
+        self.register_buffer('num_reset', torch.tensor(0, dtype=torch.long))
         self.weight = nn.Parameter(base_layer.weight.data, requires_grad=False)
         if base_layer.bias is not None: 
             self.bias = nn.Parameter(base_layer.bias.data, requires_grad=False)
@@ -34,21 +34,28 @@ class LoRABase(nn.Module):
             nn.init.zeros_(self.B_curr)
         elif self.init_strategy == 'svd': 
             with torch.no_grad(): 
-                U, S, V = torch.svd_lowrank(self.weight.data, q=self.r, niter=2)
+                U, S, V = torch.svd_lowrank(self.weight.data, q=self.r, niter=4)
                 self.A_curr.data = V.t()
                 nn.init.zeros_(self.B_curr)
         elif self.init_strategy == 'pissa': 
-            with torch.no_grad(): 
-                U, S, V = torch.svd_lowrank(self.weight.data, q=self.r, niter=2)
-                S_diag = torch.diag(S) / self.scaling
-                sqrt_S = torch.sqrt(S_diag)
-                
-                self.A_curr.data = torch.mm(sqrt_S, V.t())
-                self.B_curr.data = torch.mm(U, sqrt_S)
-                
-                W_core = torch.mm(U, torch.mm(S_diag, V.t()))
-                if self.num_reset == 0: 
+            if self.num_reset.item() == 0:
+                with torch.no_grad(): 
+                    U, S, V = torch.svd_lowrank(self.weight.data, q=self.r, niter=4)
+                    S_diag = torch.diag(S) / self.scaling
+                    sqrt_S = torch.sqrt(S_diag)
+                    
+                    self.A_curr.data = torch.mm(sqrt_S, V.t())
+                    self.B_curr.data = torch.mm(U, sqrt_S)
+                    self.register_buffer('A_core', self.A_curr.data.clone())
+                    self.register_buffer('B_core', self.B_curr.data.clone())
+                    
+                    W_core = torch.mm(self.B_core, self.A_core) * self.scaling
                     self.weight.data = self.weight.data - W_core
+            else: 
+                with torch.no_grad():
+                    self.A_curr.data = self.A_core.clone()
+                    self.B_curr.data = self.B_core.clone()
+
         else: 
             raise ValueError(f"Unknown init_strategy: {self.init_strategy}")
         
@@ -57,3 +64,15 @@ class LoRABase(nn.Module):
     def compute_delta_w(self): 
         delta_w = torch.mm(self.B_curr, self.A_curr) * self.scaling
         return delta_w.to(self.target_dtype)
+
+    def pre_load_undo(self): 
+        if self.init_strategy == 'pissa': 
+            with torch.no_grad(): 
+                W_core_trash = torch.mm(self.B_core, self.A_core) * self.scaling
+                self.weight.data = self.weight.data + W_core_trash
+    
+    def post_load_redo(self): 
+        if self.init_strategy == 'pissa': 
+            with torch.no_grad(): 
+                W_core_loaded = torch.mm(self.B_core, self.A_core) * self.scaling
+                self.weight.data = self.weight.data - W_core_loaded

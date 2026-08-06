@@ -12,40 +12,52 @@ class ContinualLoRABase(LoRABase):
         
         self.register_buffer(
             'cache_history_delta_w', 
-            torch.zeros(self.out_features, self.in_features))
-        self.reset_parameters()
-        
+            torch.zeros(self.out_features, self.in_features),
+            persistent=False)
+    
+    def rebuild_cache(self): 
+        with torch.no_grad(): 
+            self.cache_history_delta_w.zero_()
+            for A_old, B_old in zip(self.history_A, self.history_B): 
+                self.cache_history_delta_w += torch.mm(B_old, A_old) # out_features * in_features
+                
     def add_task(self): 
         with torch.no_grad(): 
-            current_delta = torch.mm(self.B_curr, self.A_curr) # out_features * in_features
-            self.cache_history_delta_w += current_delta.to(self.target_dtype)
-        self.A_curr.requires_grad = False
-        self.B_curr.requires_grad = False
-        
-        A_old = nn.Parameter(self.A_curr.data.clone(), requires_grad=False)
-        B_old = nn.Parameter(self.B_curr.data.clone(), requires_grad=False)
-            
-        self.history_A.append(A_old)
-        self.history_B.append(B_old)
-        
-        with torch.no_grad(): 
+            # A_curr: r * in_features
+            # B_curr: out_features * r
+            if self.init_strategy == 'pissa':
+                B_old = torch.concat([self.B_curr.data.clone(), -self.B_core.data.clone()], dim=1) # out_features * (r + r_core)
+                A_old = torch.concat([self.A_curr.data.clone(), self.A_core.data.clone()], dim=0) # (r + r_core) * in_features
+            else: 
+                B_old = self.B_curr.data.clone() # out_features * r
+                A_old = self.A_curr.data.clone() # r * in_features
+            self.history_A.append(A_old)
+            self.history_B.append(B_old)
+            self.cache_history_delta_w += torch.mm(B_old, A_old) # out_features * in_features
             self.reset_parameters()
-            
-        self.A_curr.requires_grad = True
-        self.B_curr.requires_grad = True
-        
         
     def get_orthogonal_loss(self): 
         loss = 0.0
         if len(self.history_B) == 0:
             return loss 
-        
-        for A_old, B_old in zip(self.history_A, self.history_B): 
-            M_A = torch.mm(self.A_curr, A_old.T) # r * r
-            loss += torch.sum(torch.square(M_A))
+        if self.init_strategy == 'pissa':
+            A_curr = torch.concat([self.A_curr, self.A_core], dim=0) # (r + r_core) * in_features
+            B_curr = torch.concat([self.B_curr, -self.B_core], dim=1) # out_features * (r + r_core)
+        else:
+            A_curr = self.A_curr # r * in_features
+            B_curr = self.B_curr # out_features * r
             
-            M_B = torch.mm(B_old.T, self.B_curr) # r * r
-            loss += torch.sum(torch.square(M_B))
+        A_curr = F.normalize(A_curr, p=2, dim=-1) # (r + r_core) * in_features
+        B_curr = F.normalize(B_curr, p=2, dim=0) # out_features * (r + r_core)
+        A_old = torch.concat(self.history_A, dim=0) # (num_tasks * r) * in_features
+        B_old = torch.concat(self.history_B, dim=1) # out_features * (num_tasks * r)
+        
+        A_old_norm = F.normalize(A_old, p=2, dim=-1) # (num_tasks * r) * in_features
+        B_old_norm = F.normalize(B_old, p=2, dim=0) # out_features * (num_tasks * r)    
+        
+        A_loss = torch.mean(torch.square(torch.mm(A_curr, A_old_norm.t()))) # (r + r_core) * (num_tasks * r)
+        B_loss = torch.mean(torch.square(torch.mm(B_old_norm.t(), B_curr))) # (num_tasks * r) * (r + r_core)
+        loss = A_loss + B_loss
         return loss
     
     def compute_delta_w(self): 
