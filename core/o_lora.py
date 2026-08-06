@@ -49,8 +49,8 @@ class ContinualLoRABase(LoRABase):
             
         A_curr = F.normalize(A_curr, p=2, dim=-1) # (r + r_core) * in_features
         B_curr = F.normalize(B_curr, p=2, dim=0) # out_features * (r + r_core)
-        A_old = torch.concat(self.history_A, dim=0) # (num_tasks * r) * in_features
-        B_old = torch.concat(self.history_B, dim=1) # out_features * (num_tasks * r)
+        A_old = torch.concat(list(self.history_A), dim=0) # (num_tasks * r) * in_features
+        B_old = torch.concat(list(self.history_B), dim=1) # out_features * (num_tasks * r)
         
         A_old_norm = F.normalize(A_old, p=2, dim=-1) # (num_tasks * r) * in_features
         B_old_norm = F.normalize(B_old, p=2, dim=0) # out_features * (num_tasks * r)    
