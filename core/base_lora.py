@@ -36,8 +36,6 @@ class LoRABase(nn.Module):
             with torch.no_grad(): 
                 weight_fp32 = self.weight.data.to(torch.float32)
                 U, S, V = torch.svd_lowrank(weight_fp32, q=self.r, niter=4)
-                U = U.to(self.target_dtype)
-                V = V.to(self.target_dtype)
                 self.A_curr.data = V.t()
                 nn.init.zeros_(self.B_curr)
         elif self.init_strategy == 'pissa': 
@@ -45,9 +43,6 @@ class LoRABase(nn.Module):
                 with torch.no_grad(): 
                     weight_fp32 = self.weight.data.to(torch.float32)
                     U, S, V = torch.svd_lowrank(weight_fp32, q=self.r, niter=4)
-                    U = U.to(self.target_dtype)
-                    V = V.to(self.target_dtype)
-                    S = S.to(self.target_dtype) 
                     S_diag = torch.diag(S) / self.scaling
                     sqrt_S = torch.sqrt(S_diag)
                     
@@ -56,8 +51,8 @@ class LoRABase(nn.Module):
                     self.register_buffer('A_core', self.A_curr.data.clone())
                     self.register_buffer('B_core', self.B_curr.data.clone())
                     
-                    W_core = torch.mm(self.B_core, self.A_core) * self.scaling
-                    self.weight.data = self.weight.data - W_core
+                    W_core_fp32 = torch.mm(self.B_core, self.A_core) * self.scaling
+                    self.weight.data = self.weight.data - W_core_fp32.to(self.target_dtype)
             else: 
                 with torch.no_grad():
                     self.A_curr.data = self.A_core.clone()
