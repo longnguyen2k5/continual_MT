@@ -34,13 +34,20 @@ class LoRABase(nn.Module):
             nn.init.zeros_(self.B_curr)
         elif self.init_strategy == 'svd': 
             with torch.no_grad(): 
-                U, S, V = torch.svd_lowrank(self.weight.data, q=self.r, niter=4)
+                weight_fp32 = self.weight.data.to(torch.float32)
+                U, S, V = torch.svd_lowrank(weight_fp32, q=self.r, niter=4)
+                U = U.to(self.target_dtype)
+                V = V.to(self.target_dtype)
                 self.A_curr.data = V.t()
                 nn.init.zeros_(self.B_curr)
         elif self.init_strategy == 'pissa': 
             if self.num_reset.item() == 0:
                 with torch.no_grad(): 
-                    U, S, V = torch.svd_lowrank(self.weight.data, q=self.r, niter=4)
+                    weight_fp32 = self.weight.data.to(torch.float32)
+                    U, S, V = torch.svd_lowrank(weight_fp32, q=self.r, niter=4)
+                    U = U.to(self.target_dtype)
+                    V = V.to(self.target_dtype)
+                    S = S.to(self.target_dtype) 
                     S_diag = torch.diag(S) / self.scaling
                     sqrt_S = torch.sqrt(S_diag)
                     
