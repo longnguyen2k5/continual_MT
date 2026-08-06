@@ -22,3 +22,4 @@ mole_config:
   router_loss_weight: 0.01      # Hệ số phạt nếu Router dồn việc cho 1 chuyên gia
 precision: '16-mixed' # '16-mixed' | '32-true' | 'bf16-mixed' 
 lora_method: 'olora' # olora | oliera
+init_strategy: 'pissa' # kaiming | normal | svd | pissa

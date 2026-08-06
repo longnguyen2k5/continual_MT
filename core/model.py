@@ -22,7 +22,9 @@ class NormalMTModel(pl.LightningModule):
                                            method=config.get('lora_method', 'olora'),
                                            r=config['lora_rank'], 
                                            lora_alpha=config['lora_alpha'],
-                                           target_modules=config.get('target_modules', ['q_proj', 'v_proj']))
+                                           target_modules=config.get('target_modules', ['q_proj', 'v_proj']),
+                                           init_strategy=config.get('init_strategy', 'kaiming')
+                                           )
         
         self.print_trainable_parameters()
         

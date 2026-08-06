@@ -66,7 +66,7 @@ class ContinualLoRABase(LoRABase):
         return total_delta_w.to(self.target_dtype)
     
 class OLoRALinear(ContinualLoRABase): 
-    def __init__(self, base_layer: nn.Linear , r: int=16, lora_alpha: int=1, init_strategy: str='kaiming'): 
+    def __init__(self, base_layer: nn.Linear , r: int=16, lora_alpha: int=1, init_strategy: str='pissa'): 
         super().__init__(base_layer, r=r, lora_alpha=lora_alpha, init_strategy=init_strategy)
     def forward(self, x: torch.Tensor):
         delta_w = self.compute_delta_w() # out_features * in_features
@@ -84,16 +84,21 @@ class OLieRaLinear(ContinualLoRABase):
         w_active = self.weight * scale_factor # out_features * in_features
         return F.linear(x, w_active, self.bias)
     
-def inject_continual_lora(model: nn.Module, method: str = 'oliera', r: int = 16, lora_alpha: int = 1, target_modules: list = ['q_proj', 'v_proj']): 
+def inject_continual_lora(model: nn.Module, 
+                          method: str = 'oliera', 
+                          r: int = 16, 
+                          lora_alpha: int = 1, 
+                          target_modules: list = ['q_proj', 'v_proj'],
+                          init_strategy: str = 'kaiming'): 
     for name, module in model.named_children(): 
         if isinstance(module, nn.Linear) and any(target in name for target in target_modules):
             TargetClass = OLieRaLinear if method == 'oliera' else OLoRALinear
-            new_layer = TargetClass(module, r=r, lora_alpha=lora_alpha)
+            new_layer = TargetClass(module, r=r, lora_alpha=lora_alpha, init_strategy=init_strategy)
             
             setattr(model, name, new_layer)
         
         else: 
-            inject_continual_lora(module, method=method, r=r, lora_alpha=lora_alpha, target_modules=target_modules)
+            inject_continual_lora(module, method=method, r=r, lora_alpha=lora_alpha, target_modules=target_modules, init_strategy=init_strategy)
             
     return model
 
