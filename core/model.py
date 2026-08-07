@@ -42,8 +42,11 @@ class NormalMTModel(pl.LightningModule):
             use_safetensors=True,
             torch_dtype=dtype
         )
-        
+        for param in base_model.parameters():
+            if param.device.type == 'meta':
+                param.data = torch.empty_like(param, device='cpu')
         base_model.gradient_checkpointing_enable()
+        
         for param in base_model.parameters():
             param.requires_grad = False
         linear_layers = set()
