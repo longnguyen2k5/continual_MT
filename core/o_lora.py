@@ -38,6 +38,7 @@ class ContinualLoRABase(LoRABase):
         
     def get_orthogonal_loss(self): 
         loss = 0.0
+        num_tasks = len(self.history_B)
         if len(self.history_B) == 0:
             return loss 
         if self.init_strategy == 'pissa':
@@ -46,18 +47,16 @@ class ContinualLoRABase(LoRABase):
         else:
             A_curr = self.A_curr # r * in_features
             B_curr = self.B_curr # out_features * r
+        
+        for A_old, B_old in zip(self.history_A, self.history_B):
+            # shape : B out_features * r_old, A r_old * in_features
             
-        A_curr = F.normalize(A_curr, p=2, dim=-1) # (r + r_core) * in_features
-        B_curr = F.normalize(B_curr, p=2, dim=0) # out_features * (r + r_core)
-        A_old = torch.concat(list(self.history_A), dim=0) # (num_tasks * r) * in_features
-        B_old = torch.concat(list(self.history_B), dim=1) # out_features * (num_tasks * r)
-        
-        A_old_norm = F.normalize(A_old, p=2, dim=-1) # (num_tasks * r) * in_features
-        B_old_norm = F.normalize(B_old, p=2, dim=0) # out_features * (num_tasks * r)    
-        
-        A_loss = torch.mean(torch.square(torch.mm(A_curr, A_old_norm.t()))) # (r + r_core) * (num_tasks * r)
-        B_loss = torch.mean(torch.square(torch.mm(B_old_norm.t(), B_curr))) # (num_tasks * r) * (r + r_core)
-        loss = A_loss + B_loss
+            B_term = torch.mm(B_old.t(), B_curr) # r_old * (r + r_core)
+            A_term = torch.mm(A_curr, A_old.t()) # (r + r_core) * r_old
+            
+            frobenius_inner = torch.trace(torch.mm(B_term, A_term))
+            loss += torch.square(frobenius_inner)
+        loss = loss / num_tasks
         return loss
     
     def compute_delta_w(self): 
