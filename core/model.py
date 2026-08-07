@@ -41,21 +41,9 @@ class NormalMTModel(pl.LightningModule):
             cache_dir=config['cache_dir'],
             use_safetensors=True,
             torch_dtype=dtype, 
-            low_cpu_mem_usage=False
+            device_map='cpu'
         )
         
-        base_model = base_model.to_empty(device=torch.device("cpu"))
-        
-        # 3. Nạp lại trọng số thật từ file safetensors/bin đã tải về vào bộ nhớ vừa cấp phát
-        base_model.load_state_dict(
-            AutoModelForSeq2SeqLM.from_pretrained(
-                config['model_name'], 
-                cache_dir=config['cache_dir'],
-                use_safetensors=True,
-                torch_dtype=dtype
-            ).state_dict(),
-            strict=True
-        )
         
         base_model.gradient_checkpointing_enable()
         
