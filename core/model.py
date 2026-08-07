@@ -41,7 +41,7 @@ class NormalMTModel(pl.LightningModule):
             cache_dir=config['cache_dir'],
             use_safetensors=True,
             torch_dtype=dtype, 
-            device_map='cpu'
+            low_cpu_mem_usage=False
         )
         
         
