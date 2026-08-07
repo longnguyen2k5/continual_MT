@@ -40,11 +40,13 @@ class NormalMTModel(pl.LightningModule):
             config['model_name'], 
             cache_dir=config['cache_dir'],
             use_safetensors=True,
-            torch_dtype=dtype
+            torch_dtype=dtype, 
+            low_cpu_mem_usage=False
         )
-        for param in base_model.parameters():
-            if param.device.type == 'meta':
-                param.data = torch.empty_like(param, device='cpu')
+        
+        # base_model = base_model.to_empty(device=torch.device('cpu'))
+        # base_model = base_model.init_weights()
+        
         base_model.gradient_checkpointing_enable()
         
         for param in base_model.parameters():
