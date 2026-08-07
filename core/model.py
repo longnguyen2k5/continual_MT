@@ -40,8 +40,7 @@ class NormalMTModel(pl.LightningModule):
             config['model_name'], 
             cache_dir=config['cache_dir'],
             use_safetensors=True,
-            torch_dtype=dtype, 
-            low_cpu_mem_usage=False
+            torch_dtype=dtype
         )
         
         
@@ -179,39 +178,6 @@ class NormalMTModel(pl.LightningModule):
         bleu = sacrebleu.corpus_bleu(self.val_preds, [self.val_refs]).score
         print(f"\n🔥 KẾT QUẢ ĐÁNH GIÁ CHÍNH THỨC - BLEU: {bleu:.2f} 🔥\n")
         self.log("test_bleu", bleu)
-        print("\n⏳ Đang tải mô hình COMET để chấm điểm ngữ nghĩa...")
-        
-        try:
-            from comet import download_model, load_from_checkpoint
-            import gc
-            
-            # Đóng gói data theo chuẩn của COMET
-            data = [
-                {"src": src, "mt": mt, "ref": ref}
-                for src, mt, ref in zip(self.val_srcs, self.val_preds, self.val_refs)
-            ]
-            
-            # Tải và load model COMET
-            model_path = download_model("Unbabel/wmt22-comet-da")
-            comet_model = load_from_checkpoint(model_path)
-            
-            print("⏳ Đang chấm điểm COMET...")
-            # gpus=1 (hoặc devices=1) để chạy COMET trên GPU Kaggle
-            model_output = comet_model.predict(data, batch_size=16, gpus=1)
-            comet_score = model_output.system_score
-            
-            print(f"🌟 KẾT QUẢ ĐÁNH GIÁ - COMET: {comet_score:.4f} 🌟\n")
-            self.log("test_comet", comet_score)
-            
-            # Dọn rác VRAM ngay sau khi chấm xong
-            del comet_model
-            gc.collect()
-            torch.cuda.empty_cache()
-            
-        except ImportError:
-            print("⚠️ Chưa cài thư viện COMET. Hãy chạy: pip install unbabel-comet")
-        except Exception as e:
-            print(f"⚠️ Lỗi khi chạy COMET: {e}")
             
         self.val_preds.clear()
         self.val_refs.clear()
