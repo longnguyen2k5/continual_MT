@@ -11,7 +11,7 @@ import gc
 from utils.helpers import load_config
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-def main(config_path, method=None): 
+def main(config_path, method=None, init_strategy=None): 
     pl.seed_everything(42, workers=True)
     config = load_config(config_path)
     
@@ -22,6 +22,8 @@ def main(config_path, method=None):
     )
     if method is not None: 
         config['lora_method'] = method
+    if init_strategy is not None:
+        config['init_strategy'] = init_strategy
     model = NormalMTModel(config, tokenizer)
     
     data_collator = DataCollatorForSeq2Seq(
@@ -101,7 +103,9 @@ def main(config_path, method=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Continual Machine Translation")
     parser.add_argument("--config", type=str, default="configs/local.yaml", help="Đường dẫn file config")
-    parser.add_argument("--method", type=str, default=None, choices=['lora', 'olora', 'oliera', 'mole'], 
+    parser.add_argument("--method", type=str, default=None, choices=['lora', 'olora', 'oliera'], 
                         help="Phương pháp muốn chạy (ghi đè file config)")
+    parser.add_argument("--init-strategy", type=str, default=None, choices=['pissa', 'kaiming', 'normal', 'svd'], 
+                        help="Chiến lược khởi tạo trọng số (ghi đè file config)")
     args = parser.parse_args()
-    main(args.config, method=args.method)
+    main(args.config, method=args.method, init_strategy=args.init_strategy)
