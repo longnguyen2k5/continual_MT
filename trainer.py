@@ -11,7 +11,7 @@ import gc
 from utils.helpers import load_config
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-def main(config_path): 
+def main(config_path, method=None): 
     pl.seed_everything(42, workers=True)
     config = load_config(config_path)
     
@@ -20,7 +20,8 @@ def main(config_path):
         cache_dir=config['cache_dir'],
         use_safetensors=True
     )
-    
+    if method is not None: 
+        config['lora_method'] = method
     model = NormalMTModel(config, tokenizer)
     
     data_collator = DataCollatorForSeq2Seq(
@@ -100,5 +101,7 @@ def main(config_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Continual Machine Translation")
     parser.add_argument("--config", type=str, default="configs/local.yaml", help="Đường dẫn file config")
+    parser.add_argument("--method", type=str, default=None, choices=['lora', 'olora', 'oliera', 'mole'], 
+                        help="Phương pháp muốn chạy (ghi đè file config)")
     args = parser.parse_args()
-    main(args.config)
+    main(args.config, method=args.method)

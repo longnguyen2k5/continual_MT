@@ -78,3 +78,12 @@ class LoRABase(nn.Module):
             with torch.no_grad(): 
                 W_core_loaded = torch.mm(self.B_core, self.A_core) * self.scaling
                 self.weight.data = self.weight.data - W_core_loaded
+                
+class StandardLoRALinear(LoRABase):
+    def __init__(self, base_layer: nn.Linear, r: int=16, lora_alpha: int=1, init_strategy: str='kaiming'):
+        super().__init__(base_layer, r=r, lora_alpha=lora_alpha, init_strategy=init_strategy)
+    
+    def forward(self, x: torch.Tensor): 
+        delta_w = self.compute_delta_w() # out_features * in_features
+        w_active = self.weight + delta_w # out_features * in_features
+        return F.linear(x, w_active, self.bias)

@@ -1,7 +1,8 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, get_cosine_schedule_with_warmup
 import torch
 import pytorch_lightning as pl
-from core.o_lora import inject_continual_lora, get_total_orthogonal_loss, ContinualLoRABase
+from core import inject_lora
+from core.o_lora import get_total_orthogonal_loss, ContinualLoRABase
 import os
 import sacrebleu
 import torch.nn as nn
@@ -18,13 +19,13 @@ class NormalMTModel(pl.LightningModule):
         self.checkpoint_path = config.get("checkpoint_path", "./checkpoints")
         self.max_length = config.get("max_length", 128)
         base_model = self._build_base_model(config)
-        self.model = inject_continual_lora(base_model, 
-                                           method=config.get('lora_method', 'olora'),
-                                           r=config['lora_rank'], 
-                                           lora_alpha=config['lora_alpha'],
-                                           target_modules=config.get('target_modules', ['q_proj', 'v_proj']),
-                                           init_strategy=config.get('init_strategy', 'kaiming')
-                                           )
+        self.model = inject_lora(base_model, 
+                                method=config.get('lora_method', 'olora'),
+                                r=config['lora_rank'], 
+                                lora_alpha=config['lora_alpha'],
+                                target_modules=config.get('target_modules', ['q_proj', 'v_proj']),
+                                init_strategy=config.get('init_strategy', 'kaiming')
+                                )
         
         self.print_trainable_parameters()
         
