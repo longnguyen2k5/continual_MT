@@ -29,7 +29,7 @@ def main(config_path):
         padding=True
     )
     
-    continual_task = ['medical', 'it', 'general']
+    continual_task = ['general', 'medical', 'news']
     
     for task_idx, domain_name in enumerate(continual_task): 
         print(f"🚀 Bắt đầu huấn luyện cho domain: {domain_name}")

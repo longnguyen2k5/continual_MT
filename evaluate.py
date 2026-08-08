@@ -40,7 +40,7 @@ def evaluate(config_path, checkpoint_path):
         precision='bf16-mixed'
     )
     
-    domain_to_test = ['medical', 'it', 'general']
+    domain_to_test = ['medical', 'news', 'general']
     
     for domain_name in domain_to_test:
         test_data_list = get_domain_data(domain_name, split_type='test', num_sample=config.get("num_test_sample", None))
