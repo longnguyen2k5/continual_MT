@@ -8,8 +8,13 @@ from utils.helpers import load_config
 from core.model import NormalMTModel
 from datamodules.dataset import ContinualTranslationDataset, get_domain_data
 
-def evaluate(config_path, checkpoint_path): 
+def evaluate(config_path, checkpoint_path, method=None, init_strategy=None): 
     config = load_config(config_path)
+    
+    if method is not None:
+        config['lora_method'] = method
+    if init_strategy is not None:
+        config['init_strategy'] = init_strategy
     
     tokenizer = AutoTokenizer.from_pretrained(
         config['model_name'],
@@ -59,6 +64,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate Continual Machine Translation Model")
     parser.add_argument("--config", type=str, default="config/local.yaml", help="Path to the config file")
     parser.add_argument("--checkpoint", type=str, default=None, help="Path to the model checkpoint")
+    parser.add_argument("--method", type=str, default=None, choices=['lora', 'olora', 'oliera', 'mole'], 
+                        help="Method to evaluate (overrides config file)")
+    parser.add_argument("--init-strategy", type=str, default=None, choices=['pissa', 'kaiming', 'normal', 'svd'], 
+                        help="Weight initialization strategy (overrides config file)")
+    
     args = parser.parse_args()
     
-    evaluate(args.config, args.checkpoint)
+    evaluate(args.config, args.checkpoint, method=args.method, init_strategy=args.init_strategy)
