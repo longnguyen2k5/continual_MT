@@ -20,21 +20,21 @@ def main():
     dataset_med = get_domain_data(domain_name='medical', split_type='test', num_sample=500, cache_dir='./data')
     med_sentences = [ex["en"] for ex in dataset_med]
 
-    # 2. TASK 2: CÔNG NGHỆ / PHẦN MỀM (KDE4)
-    print("📥 2/3: Đang tải KDE4 (Văn phong IT)...")
-    dataset_it = get_domain_data(domain_name='it', split_type='train', num_sample=500, cache_dir='./data')
-    it_sentences = [ex["en"] for ex in dataset_it]
+    # 2. TASK 2: NEWS
+    print("📥 2/3: Đang tải NEWS (Văn phong Tin tức)...")
+    dataset_news = get_domain_data(domain_name='news', split_type='train', num_sample=500, cache_dir='./data')
+    news_sentences = [ex["en"] for ex in dataset_news]
 
-    # 3. TASK 3: PHIM ẢNH (OPUS-100 Subtitles)
-    print("📥 3/3: Đang tải opus-100 (Văn phong Đời sống)...")
+    # 3. TASK 3: thainq107/iwslt2015-en-vi
+    print("📥 3/3: Đang tải thainq107/iwslt2015-en-vi (Văn phong Giao tiếp)...")
     dataset_sub = get_domain_data(domain_name='general', split_type='train', num_sample=500, cache_dir='./data')
     subtitles_sentences = [ex["en"] for ex in dataset_sub]
 
     # --- GỘP DỮ LIỆU ---
-    all_sentences = med_sentences + it_sentences + subtitles_sentences
+    all_sentences = med_sentences + news_sentences + subtitles_sentences
     labels = (
         ["Medical (Y khoa)"] * len(med_sentences) + 
-        ["IT (Phần mềm)"] * len(it_sentences) + 
+        ["News (Tin tức)"] * len(news_sentences) + 
         ["Subtitles (Phim ảnh)"] * len(subtitles_sentences)
     )
 
@@ -55,8 +55,8 @@ def main():
     })
 
     plt.figure(figsize=(10, 8))
-    # Y khoa (Đỏ) - IT (Cam) - Phim ảnh (Xanh)
-    colors = {'Medical (Y khoa)': '#d62728', 'IT (Phần mềm)': '#ff7f0e', 'Subtitles (Phim ảnh)': '#2ca02c'}
+    # Y khoa (Đỏ) - Tin tức (Cam) - Phim ảnh (Xanh)
+    colors = {'Medical (Y khoa)': '#d62728', 'News (Tin tức)': '#ff7f0e', 'Subtitles (Phim ảnh)': '#2ca02c'}
     
     for domain in colors.keys():
         subset = df[df['Domain'] == domain]
@@ -79,20 +79,20 @@ def main():
     
     # 1. Tính số lượng từ của mỗi câu (cách đơn giản nhất là split bằng khoảng trắng)
     med_lengths = [len(s.split()) for s in med_sentences]
-    it_lengths = [len(s.split()) for s in it_sentences]
+    news_lengths = [len(s.split()) for s in news_sentences]
     sub_lengths = [len(s.split()) for s in subtitles_sentences]
 
     # 2. Khởi tạo Figure mới
     plt.figure(figsize=(10, 6))
     
     # 3. Tìm chiều dài lớn nhất để chia bin (cột) cho đều
-    max_len = max(max(med_lengths), max(it_lengths), max(sub_lengths))
+    max_len = max(max(med_lengths), max(news_lengths), max(sub_lengths))
     bins = np.linspace(0, max_len, 40) # Chia làm 40 cột
 
     # 4. Vẽ 3 histogram đè lên nhau (dùng alpha=0.5 để làm trong suốt)
     # Vẫn giữ nguyên tone màu đồng bộ với biểu đồ t-SNE
     plt.hist(med_lengths, bins=bins, alpha=0.6, label='Medical (Y khoa)', color='#d62728', edgecolor='white')
-    plt.hist(it_lengths, bins=bins, alpha=0.6, label='IT (Phần mềm)', color='#ff7f0e', edgecolor='white')
+    plt.hist(news_lengths, bins=bins, alpha=0.6, label='News (Tin tức)', color='#ff7f0e', edgecolor='white')
     plt.hist(sub_lengths, bins=bins, alpha=0.6, label='Subtitles (Phim ảnh)', color='#2ca02c', edgecolor='white')
 
     # 5. Trang trí biểu đồ
