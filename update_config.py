@@ -27,13 +27,13 @@ if __name__ == '__main__':
     parser.add_argument("--config", type=str, required=True, help="Đường dẫn tới file config YAML")
     parser.add_argument("--lora_method", type=str, choices=['lora', 'olora', 'oliera'], help="Phương pháp LoRA muốn sử dụng")
     parser.add_argument("--init_strategy", type=str, choices=['pissa', 'kaiming', 'normal', 'svd'], help="Chiến lược khởi tạo trọng số")
-    parser.add_argument("--lora-alpha", type=int, help="Hệ số alpha của LoRA (nếu áp dụng)")
+    parser.add_argument("--lora_alpha", type=int, help="Hệ số alpha của LoRA (nếu áp dụng)")
     args = parser.parse_args()
     
     args_dict = {
         "lora_method": args.lora_method,
         "init_strategy": args.init_strategy,
-        "lora-alpha": args.lora_alpha
+        "lora_alpha": args.lora_alpha
     }
     
     update_yaml_file(args.config, args_dict)
