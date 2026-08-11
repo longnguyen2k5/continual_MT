@@ -66,7 +66,7 @@ class MoLETokenRouter(nn.Module):
 
 class ContinualMoLELinear(nn.Module): 
     def __init__(self, base_layer: nn.Linear, 
-                 rank: int, 
+                 r: int, 
                  lora_alpha: int, 
                  num_token_experts: int=4, 
                  top_k: int=2, 
@@ -82,12 +82,12 @@ class ContinualMoLELinear(nn.Module):
             self.bias = nn.Parameter(self.base_layer.bias.data, requires_grad=False)
             
         self.token_router = MoLETokenRouter(self.hidden_dim, num_token_experts=num_token_experts)
-        self.token_experts = MoLETokenExperts(r=rank, lora_alpha=lora_alpha, 
+        self.token_experts = MoLETokenExperts(r=r, lora_alpha=lora_alpha, 
                                               in_features=self.hidden_dim, 
                                               out_features=self.base_layer.out_features, 
                                               num_experts=num_token_experts, 
                                               init_strategy=self.init_strategy)
-        self.shared_expert = MoLEExpert(r=rank, lora_alpha=lora_alpha, hidden_dim=self.hidden_dim, init_strategy=self.init_strategy)
+        self.shared_expert = MoLEExpert(r=r, lora_alpha=lora_alpha, hidden_dim=self.hidden_dim, init_strategy=self.init_strategy)
         
         self.num_task = 0
         self.task_keys = nn.Parameter(torch.empty(0, self.hidden_dim), requires_grad=False)
