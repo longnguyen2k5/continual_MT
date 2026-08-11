@@ -112,7 +112,7 @@ class NormalMTModel(pl.LightningModule):
         
     def configure_optimizers(self):
         trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
-        optimizer = torch.optim.AdamW(trainable_params, lr=self.cfg.lr)
+        optimizer = torch.optim.AdamW(trainable_params, lr=self.cfg.learning_rate)
         total_steps = self.trainer.estimated_stepping_batches
         warmup_steps = int(total_steps * 0.05)  # 5% warmup
         
