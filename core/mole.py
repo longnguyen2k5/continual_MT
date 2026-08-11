@@ -159,9 +159,9 @@ class ContinualMoLELinear(nn.Module):
         token_expert_outputs = self.token_experts(x, expert_mask)
         
         if self.cache_best_task_idx is not None and self.cache_theta_t is not None and self.cache_theta_IE is not None:
-            theta_t = self.cache_theta_t
-            theta_IE = self.cache_theta_IE
-            theta_t_indices = self.cache_best_task_idx
+            theta_t = self.cache_theta_t.to(x.device)
+            theta_IE = self.cache_theta_IE.to(x.device)
+            theta_t_indices = self.cache_best_task_idx.to(x.device)
         else: 
             sentence_representation = x.mean(dim=1) # batch_size, hidden_dim 
             cos_sim = F.cosine_similarity(
@@ -174,9 +174,9 @@ class ContinualMoLELinear(nn.Module):
             theta_t, theta_t_indices = torch.max(task_scores, dim=-1) # batch_size
             theta_IE = 1 - theta_t # batch_size 
             
-            self.cache_best_task_idx = theta_t_indices
-            self.cache_theta_t = theta_t
-            self.cache_theta_IE = theta_IE
+            self.cache_best_task_idx = theta_t_indices.to(x.device)
+            self.cache_theta_t = theta_t.to(x.device)
+            self.cache_theta_IE = theta_IE.to(x.device)
         
         curr_indices = theta_t_indices.to(x.device).unsqueeze(-1)
         curr_src = theta_t.to(x.device).unsqueeze(-1)
@@ -191,7 +191,7 @@ class ContinualMoLELinear(nn.Module):
                 delta_out = experts(x) * weight_t
                 task_expert_outputs += delta_out
                 
-        shared_expert_output = self.shared_expert(x) * theta_IE.view(-1, 1, 1)
+        shared_expert_output = self.shared_expert(x) * theta_IE.to(x.device).view(-1, 1, 1)
         
         return base_out + token_expert_outputs + task_expert_outputs + shared_expert_output
 
