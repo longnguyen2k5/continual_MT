@@ -25,7 +25,7 @@ def update_yaml_file(file_path, args_dict):
 if __name__ == '__main__': 
     parser = argparse.ArgumentParser(description="Cập nhật file YAML config")
     parser.add_argument("--config", type=str, required=True, help="Đường dẫn tới file config YAML")
-    parser.add_argument("--lora_method", type=str, choices=['lora', 'olora', 'oliera'], help="Phương pháp LoRA muốn sử dụng")
+    parser.add_argument("--lora_method", type=str, choices=['lora', 'olora', 'oliera', 'mole'], help="Phương pháp LoRA muốn sử dụng")
     parser.add_argument("--init_strategy", type=str, choices=['pissa', 'kaiming', 'normal', 'svd'], help="Chiến lược khởi tạo trọng số")
     parser.add_argument("--lora_alpha", type=int, help="Hệ số alpha của LoRA (nếu áp dụng)")
     args = parser.parse_args()
