@@ -103,7 +103,7 @@ class ContinualMoLELinear(nn.Module):
         self.current_x = None
         self.current_router_logits = None
         
-    def add_new_task(self): 
+    def on_task_start(self): 
         if self.num_task == 0: 
             import copy 
             self.old_token_router = copy.deepcopy(self.token_router).eval()

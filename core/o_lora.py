@@ -21,7 +21,7 @@ class ContinualLoRABase(LoRABase):
             for A_old, B_old in zip(self.history_A, self.history_B): 
                 self.cache_history_delta_w += torch.mm(B_old, A_old) # out_features * in_features
                 
-    def add_task(self): 
+    def on_task_end(self): 
         with torch.no_grad(): 
             # A_curr: r * in_features
             # B_curr: out_features * r

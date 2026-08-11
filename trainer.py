@@ -73,10 +73,11 @@ def main(config_path, method=None, init_strategy=None):
         )
         
         model.current_task_name = domain_name
+        model.on_task_start()
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=validate_dataloader)
         
         if task_idx < len(continual_task) - 1:  # Nếu chưa phải là task cuối cùng
-            model.add_new_task()
+            model.on_task_end()
             
         if hasattr(model, 'trainer'):
             model.trainer = None

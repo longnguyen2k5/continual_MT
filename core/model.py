@@ -60,14 +60,22 @@ class NormalMTModel(pl.LightningModule):
     # ===========================
     # 
     # ===========================  
-    def add_new_task(self): 
+    def on_task_start(self): 
         self.num_task += 1
         count = 0
-        for name, module in self.model.named_modules(): 
-            if isinstance(module, ContinualLoRABase): 
-                module.add_task()
+        for module in self.model.modules(): 
+            if hasattr(module, 'on_task_start'): 
+                module.on_task_start()
                 count += 1
-        print(f"✅ Đã thêm task mới cho {count} lớp ContinualLoRA.")
+                
+        if count > 0:
+            print(f"🔄 Đã reset {count} lớp LoRA/MoLE cho task '{self.current_task_name}'")
+        
+                
+    def on_task_end(self): 
+        for module in self.model.modules(): 
+            if hasattr(module, 'on_task_end'): 
+                module.on_task_end()
         
     def print_trainable_parameters(self):
         """Hàm tự viết để đếm số lượng tham số được phép huấn luyện"""
@@ -96,8 +104,11 @@ class NormalMTModel(pl.LightningModule):
             loss_ortho = get_total_orthogonal_loss(self.model)
             total_loss = task_loss + self.cfg.orthogonal_loss_weight * loss_ortho
         elif self.cfg.lora_method == 'mole': 
-            routing_loss = get_total_routing_loss(self.model, self.cfg.gamma, self.cfg.delta)
-            total_loss = (1 - (self.num_task - 1) / (self.num_task)) * task_loss + (self.num_task - 1) / self.num_task * routing_loss
+            if self.num_task > 1: 
+                routing_loss = get_total_routing_loss(self.model, self.cfg.gamma, self.cfg.delta)
+                total_loss = (1 - (self.num_task - 1) / (self.num_task)) * task_loss + (self.num_task - 1) / self.num_task * routing_loss
+            else: 
+                total_loss = task_loss
         else:
             total_loss = task_loss
             
