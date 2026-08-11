@@ -77,7 +77,10 @@ class ContinualMoLELinear(nn.Module):
         self.top_k = top_k
         self.init_strategy = init_strategy
         
+        self.r = r 
+        self.lora_alpha = lora_alpha
         self.base_layer.requires_grad = False
+        
         if self.base_layer.bias is not None: 
             self.bias = nn.Parameter(self.base_layer.bias.data, requires_grad=False)
             
@@ -119,10 +122,10 @@ class ContinualMoLELinear(nn.Module):
         else: 
             self.task_keys = nn.Parameter(torch.cat([self.task_keys.detach(), new_key], dim=0))
         
-        self.task_experts.append(MoLEExpert(r=self.token_experts[0].r, 
-                                            lora_alpha=self.token_experts[0].lora_alpha, 
+        self.task_experts.append(MoLEExpert(r=self.r, 
+                                            lora_alpha=self.lora_alpha, 
                                             hidden_dim=self.hidden_dim, 
-                                            init_strategy=self.token_experts[0].init_strategy))
+                                            init_strategy=self.init_strategy))
         self.num_task += 1
     
     def clear_cache(self): 
