@@ -166,7 +166,7 @@ class ContinualMoLELinear(nn.Module):
             sentence_representation = x.mean(dim=1) # batch_size, hidden_dim 
             cos_sim = F.cosine_similarity(
                 sentence_representation.unsqueeze(1), # batch_size, 1, hidden_dim
-                self.task_keys.unsqueeze(0), # 1, num_task, hidden_dim
+                self.task_keys.to(x.device).unsqueeze(0), # 1, num_task, hidden_dim
                 dim=-1
             ) # batch_size, num_task
             
@@ -177,7 +177,11 @@ class ContinualMoLELinear(nn.Module):
             self.cache_best_task_idx = theta_t_indices
             self.cache_theta_t = theta_t
             self.cache_theta_IE = theta_IE
-        task_mask = torch.zeros(batch_size, self.num_task, device=x.device).scatter_(-1, theta_t_indices.unsqueeze(-1), theta_t.unsqueeze(-1)) # batch_size, num_task
+        
+        curr_indices = theta_t_indices.to(x.device).unsqueeze(-1)
+        curr_src = theta_t.to(x.device).unsqueeze(-1)
+        
+        task_mask = torch.zeros(batch_size, self.num_task, device=x.device).scatter_(-1, curr_indices, curr_src)
         
         task_expert_outputs = torch.zeros_like(base_out)
         
