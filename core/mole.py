@@ -81,7 +81,7 @@ class ContinualMoLELinear(nn.Module):
         if self.base_layer.bias is not None: 
             self.bias = nn.Parameter(self.base_layer.bias.data, requires_grad=False)
             
-        self.token_router = MoLETokenRouter(self.hidden_dim, num_token_experts=num_token_experts)
+        self.token_router = MoLETokenRouter(self.hidden_dim, num_experts=num_token_experts)
         self.token_experts = MoLETokenExperts(r=r, lora_alpha=lora_alpha, 
                                               in_features=self.hidden_dim, 
                                               out_features=self.base_layer.out_features, 
