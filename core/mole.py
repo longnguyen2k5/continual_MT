@@ -12,8 +12,8 @@ class MoLEExpert(nn.Module):
         self.scaling = lora_alpha / math.sqrt(r)
         self.init_strategy = init_strategy
         
-        self.A = nn.Parameter(torch.empty(hidden_dim, r))
-        self.B = nn.Parameter(torch.empty(r, hidden_dim))
+        self.A = nn.Parameter(torch.empty(r, hidden_dim))
+        self.B = nn.Parameter(torch.empty(hidden_dim, r))
         self.reset_parameters()
     
     def reset_parameters(self): 
@@ -25,7 +25,12 @@ class MoLEExpert(nn.Module):
             nn.init.zeros_(self.B)
         else: 
             raise ValueError(f"Chiến lược khởi tạo '{self.init_strategy}' không hợp lệ. Vui lòng chọn từ ['kaiming', 'normal'].")
-        
+    
+    def forward(self, x: torch.Tensor): 
+        # x: batch_size, seq_len, hidden_dim
+        x_A = F.linear(x, self.A) # batch_size, seq_len, r
+        out = F.linear(x_A, self.B) # batch_size, seq_len, hidden_dim
+        return out * self.scaling
 class MoLETokenExperts(nn.Module): 
     def __init__(self, r: int, lora_alpha: int, in_features: int, out_features: int, num_experts: int, init_strategy: str='kaiming'): 
         super().__init__()
