@@ -210,7 +210,9 @@ class NormalMTModel(pl.LightningModule):
     @torch.no_grad()
     def translate_sentence(self, text): 
         self.model.eval()
-        inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
+        
+        # --- CÁCH SỬA AN TOÀN TUYỆT ĐỐI CHO INFERENCE ---
+        # 1. Xác định target dtype
         dtype_map = {
             '16-mixed': torch.float16,
             '32-true': torch.float32,
@@ -218,8 +220,21 @@ class NormalMTModel(pl.LightningModule):
         }
         target_dtype = dtype_map.get(self.cfg.precision, torch.float16)
         
-        with torch.autocast(device_type=self.device.type, dtype=target_dtype):
-            outputs = self.model.generate(**inputs, max_length=self.cfg.max_length, forced_bos_token_id=self.vi_token_id)
+        # 2. Ép TOÀN BỘ mô hình (bao gồm mọi LayerNorm, FC, LoRA...) về cùng 1 kiểu
+        # Lệnh này chỉ mất vài mili-giây nhưng dập tắt mọi lỗi dtype mismatch
+        self.model.to(dtype=target_dtype)
+        
+        # 3. Chuẩn bị input (cũng ép về device hiện tại)
+        inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
+        
+        # 4. Generate bình thường, KHÔNG CẦN autocast nữa
+        # (Vì mọi thứ từ input, weight đến layer norm đều đã đồng bộ 100% target_dtype)
+        outputs = self.model.generate(
+            **inputs, 
+            max_length=self.cfg.max_length, 
+            forced_bos_token_id=self.vi_token_id
+        )
+            
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
     
     def save_smart_checkpoint(self, save_dir, task_name):
