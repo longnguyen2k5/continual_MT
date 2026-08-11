@@ -86,6 +86,9 @@ class ContinualMoLELinear(nn.Module):
         self.lora_alpha = lora_alpha
         self.base_layer.requires_grad = False
         
+        target_dtype = self.base_layer.weight.dtype
+        target_device = self.base_layer.weight.device
+        
         if self.base_layer.bias is not None: 
             self.bias = nn.Parameter(self.base_layer.bias.data, requires_grad=False)
             
@@ -111,6 +114,10 @@ class ContinualMoLELinear(nn.Module):
         self.current_x = None
         self.current_router_logits = None
         
+        self.token_router.to(dtype=target_dtype, device=target_device)
+        self.token_experts.to(dtype=target_dtype, device=target_device)
+        self.shared_expert.to(dtype=target_dtype, device=target_device)
+        self.task_keys.data = self.task_keys.data.to(dtype=target_dtype, device=target_device)
     def on_task_start(self): 
         if self.num_task == 0: 
             import copy 
