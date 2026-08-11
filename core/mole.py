@@ -171,7 +171,7 @@ class ContinualMoLELinear(nn.Module):
             self.cache_best_task_idx = theta_t_indices
             self.cache_theta_t = theta_t
             self.cache_theta_IE = theta_IE
-        task_mask = torch.zeros(batch_size, self.num_task).scatter_(-1, theta_t_indices.unsqueeze(-1), theta_t.unsqueeze(-1)) # batch_size, num_task
+        task_mask = torch.zeros(batch_size, self.num_task, device=x.device).scatter_(-1, theta_t_indices.unsqueeze(-1), theta_t.unsqueeze(-1)) # batch_size, num_task
         
         task_expert_outputs = torch.zeros_like(base_out)
         
