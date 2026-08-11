@@ -32,8 +32,8 @@ class MoLETokenExperts(nn.Module):
         self.num_experts = num_experts
         self.scaling = lora_alpha / math.sqrt(r)
         
-        self.A_stacked = nn.Parameter(torch.empty(num_experts, r, in_features))
-        self.B_stacked = nn.Parameter(torch.empty(num_experts, out_features, r)) 
+        self.A_stacked = nn.Parameter(torch.empty(num_experts, in_features, r))
+        self.B_stacked = nn.Parameter(torch.empty(num_experts, r, out_features)) 
     
         self.reset_parameters(init_strategy)
     
@@ -49,7 +49,7 @@ class MoLETokenExperts(nn.Module):
         
     def forward(self, x: torch.Tensor, expert_mask: torch.Tensor): 
         # x: batch_size, seq_len, hidden_dim
-        x_A = torch.einsum('bsi, eri -> bser', x, self.A_stacked) # batch_size, seq_len, num_experts, r
+        x_A = torch.einsum('bsi, eir -> bser', x, self.A_stacked) # batch_size, seq_len, num_experts, r
         x_AB = torch.einsum('bser, ero -> bseo', x_A, self.B_stacked) # batch_size, seq_len, num_experts, out_features
         
         out = torch.einsum('bseo, bse -> bso', x_AB, expert_mask) # batch_size, seq_len, out_features
