@@ -6,40 +6,37 @@ from core.o_lora import get_total_orthogonal_loss, ContinualLoRABase
 import os
 import sacrebleu
 import torch.nn as nn
-
+from dataclasses import asdict
+from core.mole import flush_mole_cache, get_total_routing_loss 
+from core.config import ExperimentConfig
 
 class NormalMTModel(pl.LightningModule): 
-    def __init__(self, config, tokenizer): 
+    def __init__(self, config: ExperimentConfig, tokenizer): 
         super().__init__()
-        self.lr = config.get("learning_rate", 0.0003)
-        self.ortho_weight = config.get("orthogonal_loss_weight", 0.1)
+        self.cfg = config
         self.tokenizer = tokenizer
         self.current_task_name = 'unk'
+        self.num_task = 0
         self.vi_token_id = self.tokenizer.convert_tokens_to_ids('vie_Latn')
-        self.checkpoint_path = config.get("checkpoint_path", "./checkpoints")
-        self.max_length = config.get("max_length", 128)
-        base_model = self._build_base_model(config)
+        base_model = self._build_base_model()
         self.model = inject_lora(base_model, 
-                                method=config.get('lora_method', 'olora'),
-                                r=config['lora_rank'], 
-                                lora_alpha=config['lora_alpha'],
-                                target_modules=config.get('target_modules', ['q_proj', 'v_proj']),
-                                init_strategy=config.get('init_strategy', 'kaiming')
+                                 method=config.lora_method,
+                                 **asdict(self.cfg)
                                 )
         
         self.print_trainable_parameters()
         
-    def _build_base_model(self, config): 
+    def _build_base_model(self): 
         dtype_map = {
             '16-mixed': torch.float16,
             '32-true': torch.float32,
             'bf16-mixed': torch.bfloat16
         }
-        dtype = dtype_map.get(config.get('precision', '16-mixed'), torch.float16)
+        dtype = dtype_map.get(self.cfg.precision, torch.float16)
         
         base_model = AutoModelForSeq2SeqLM.from_pretrained(
-            config['model_name'], 
-            cache_dir=config['cache_dir'],
+            self.cfg.model_name, 
+            cache_dir=self.cfg.cache_dir,
             use_safetensors=True,
             torch_dtype=dtype
         )
@@ -64,6 +61,7 @@ class NormalMTModel(pl.LightningModule):
     # 
     # ===========================  
     def add_new_task(self): 
+        self.num_task += 1
         count = 0
         for name, module in self.model.named_modules(): 
             if isinstance(module, ContinualLoRABase): 
@@ -93,22 +91,28 @@ class NormalMTModel(pl.LightningModule):
             labels=batch["labels"]
         )
         
-        loss = outputs.loss
-        loss_ortho = get_total_orthogonal_loss(self.model)
-        
-        total_loss = loss + self.ortho_weight * loss_ortho  
+        task_loss = outputs.loss
+        if self.cfg.lora_method in ['olora', 'oliera']:
+            loss_ortho = get_total_orthogonal_loss(self.model)
+            total_loss = task_loss + self.cfg.orthogonal_loss_weight * loss_ortho
+        elif self.cfg.lora_method == 'mole': 
+            routing_loss = get_total_routing_loss(self.model, self.cfg.gamma, self.cfg.delta)
+            total_loss = (1 - (self.num_task - 1) / (self.num_task)) * task_loss + (self.num_task - 1) / self.num_task * routing_loss
+        else:
+            total_loss = task_loss
+            
         self.log("train_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return total_loss
     
     def on_train_end(self):
         """Hàm này chỉ chạy 1 lần duy nhất khi kết thúc toàn bộ max_epochs"""
         print(f"\n🏁 Đã kết thúc huấn luyện cho task '{self.current_task_name}'. Đang lưu Final Checkpoint...")
-        save_dir = self.checkpoint_path
+        save_dir = self.cfg.checkpoint_path
         self.save_smart_checkpoint(save_dir, self.current_task_name)
         
     def configure_optimizers(self):
         trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
-        optimizer = torch.optim.AdamW(trainable_params, lr=self.lr)
+        optimizer = torch.optim.AdamW(trainable_params, lr=self.cfg.lr)
         total_steps = self.trainer.estimated_stepping_batches
         warmup_steps = int(total_steps * 0.05)  # 5% warmup
         
@@ -131,12 +135,20 @@ class NormalMTModel(pl.LightningModule):
         self.val_refs = []
         self.val_srcs = [] 
         
+    def on_validation_batch_start(self, batch, batch_idx, dataloader_idx=0):
+        if self.cfg.lora_method == 'mole':
+            flush_mole_cache(self.model)
+            
+    def on_test_batch_start(self, batch, batch_idx, dataloader_idx=0):
+        if self.cfg.lora_method == 'mole':
+            flush_mole_cache(self.model)
+            
     @torch.no_grad()
     def validation_step(self, batch, batch_idx): 
         generated_tokens = self.model.generate(
             input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"],
-            max_length=self.max_length,
+            max_length=self.cfg.max_length,
             forced_bos_token_id=self.vi_token_id
         )
         labels = batch['labels']
@@ -188,7 +200,7 @@ class NormalMTModel(pl.LightningModule):
     def translate_sentence(self, text): 
         self.model.eval()
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
-        outputs = self.model.generate(**inputs, max_length=self.max_length, forced_bos_token_id=self.vi_token_id)
+        outputs = self.model.generate(**inputs, max_length=self.cfg.max_length, forced_bos_token_id=self.vi_token_id)
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
     
     def save_smart_checkpoint(self, save_dir, task_name):

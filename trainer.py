@@ -9,21 +9,25 @@ from core.model import NormalMTModel
 import os 
 import gc
 from utils.helpers import load_config
+from core.config import ExperimentConfig 
+
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def main(config_path, method=None, init_strategy=None): 
     pl.seed_everything(42, workers=True)
-    config = load_config(config_path)
+    raw_config = load_config(config_path)
+    if method is not None: 
+        raw_config['lora_method'] = method
+    if init_strategy is not None:
+        raw_config['init_strategy'] = init_strategy
+    
+    config = ExperimentConfig(**raw_config)
     
     tokenizer = AutoTokenizer.from_pretrained(
-        config['model_name'], 
-        cache_dir=config['cache_dir'],
+        config.model_name, 
+        cache_dir=config.cache_dir,
         use_safetensors=True
     )
-    if method is not None: 
-        config['lora_method'] = method
-    if init_strategy is not None:
-        config['init_strategy'] = init_strategy
     model = NormalMTModel(config, tokenizer)
     
     data_collator = DataCollatorForSeq2Seq(
@@ -37,30 +41,32 @@ def main(config_path, method=None, init_strategy=None):
     for task_idx, domain_name in enumerate(continual_task): 
         print(f"🚀 Bắt đầu huấn luyện cho domain: {domain_name}")
         
-        train_data_list = get_domain_data(domain_name, split_type='train', num_sample=config.get("num_sample", None))
-        train_dataset = ContinualTranslationDataset(train_data_list, tokenizer_name_or_path=config['model_name'], max_length=config.get("max_length", 128))
+        train_data_list = get_domain_data(domain_name, split_type='train', num_sample=config.num_sample)
+        train_dataset = ContinualTranslationDataset(train_data_list, tokenizer_name_or_path=config.model_name, max_length=config.max_length)
         
         train_dataloader = DataLoader(
             train_dataset, 
-            batch_size=config.get("batch_size", 2), 
+            batch_size=config.batch_size, 
             shuffle=True, 
             collate_fn=data_collator,
             num_workers=0
         )
         
         trainer = pl.Trainer(
-            fast_dev_run=config.get("fast_dev_run", False),
-            max_epochs=config.get("max_epochs", 3),
+            fast_dev_run=config.fast_dev_run,
+            max_epochs=config.max_epochs,
             accelerator="gpu",
             devices=1,
-            precision=config.get("precision", '16-mixed'),  # '16-mixed' | '32-true' | 'bf16-mixed'
+            precision=config.precision,  # '16-mixed' | '32-true' | 'bf16-mixed'
         )   
         
-        validate_datalist = get_domain_data(domain_name, split_type='validation', num_sample=config.get("num_sample", None))
-        validate_dataset = ContinualTranslationDataset(validate_datalist, tokenizer_name_or_path=config['model_name'], max_length=config.get("max_length", 128))
+        validate_datalist = get_domain_data(domain_name, split_type='validation', num_sample=config.num_sample)
+        validate_dataset = ContinualTranslationDataset(validate_datalist, 
+                                                       tokenizer_name_or_path=config.model_name, 
+                                                       max_length=config.max_length)
         validate_dataloader = DataLoader(
             validate_dataset,
-            batch_size=config.get("batch_size", 2),
+            batch_size=config.batch_size,
             shuffle=False,
             collate_fn=data_collator,
             num_workers=0

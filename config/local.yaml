@@ -2,13 +2,17 @@ project_name: "continual_mt_olora"
 model_name: "facebook/nllb-200-distilled-600M" # Backbone dịch máy siêu nhẹ
 cache_dir: "./models"
 learning_rate: 0.0003
-lora_rank: 16
+r: 16
 batch_size: 1          # An toàn tuyệt đối cho 4GB VRAM
 fast_dev_run: True     # Test lẹ 1 batch rồi nghỉ, không lưu model
 max_epochs: 1
 num_sample: 1000              # Lấy mẫu 1000 câu để test, không train hết dataset
 num_test_sample: 100
-orthogonal_loss_weight: 0.05
+orthogonal_loss_weight: 0.05      # Dùng cho olora
+num_token_experts: 4               # Dùng cho mole
+top_k: 2                          # Dùng cho mole
+gamma: 1.0                        # Trọng số L_rkd (mole)
+delta: 1.0                        # Trọng số L_kkd (mole)
 target_modules: 
   - "q_proj"
   - "v_proj"
@@ -17,9 +21,7 @@ target_modules:
   - "out_proj"         # THÊM: Mở khóa lớp Output Projection
 max_length: 128
 lora_alpha: 4
-mole_config:
-  router_type: "softmax"        # "softmax", "dirichlet", hoặc "task_id"
-  router_loss_weight: 0.01      # Hệ số phạt nếu Router dồn việc cho 1 chuyên gia
 precision: '16-mixed' # '16-mixed' | '32-true' | 'bf16-mixed' 
 lora_method: 'olora' # olora | oliera | lora
 init_strategy: 'pissa' # kaiming | normal | svd | pissa
+checkpoint_path: './checkpoints'
