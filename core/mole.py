@@ -195,6 +195,7 @@ class ContinualMoLELinear(nn.Module):
         if self.old_token_router is None or self.old_task_keys is None: 
             return torch.tensor(0.0, device=self.current_x.device)
         
+        self.old_token_router.to(self.current_x.device)
         student_router_log_probs = F.log_softmax(self.current_router_logits, dim=-1)
         with torch.no_grad(): 
             teacher_router_logits = self.old_token_router(self.current_x) # batch_size, seq_len, num_experts
@@ -217,7 +218,7 @@ class ContinualMoLELinear(nn.Module):
         with torch.no_grad(): 
             teacher_cos_sim = F.cosine_similarity(
                 sentence_representation.unsqueeze(1), # batch_size, 1, hidden_dim 
-                self.old_task_keys.unsqueeze(0), # 1, old_num_task, hidden_dim
+                self.old_task_keys.to(sentence_representation.device).unsqueeze(0), # 1, old_num_task, hidden_dim
                 dim=-1) # batch_size, old_num_task
             teacher_keys_probs = F.softmax(teacher_cos_sim, dim=-1)
         l_kkd = F.kl_div(student_keys_log_probs, teacher_keys_probs, reduction='batchmean')
