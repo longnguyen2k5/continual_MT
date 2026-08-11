@@ -211,7 +211,15 @@ class NormalMTModel(pl.LightningModule):
     def translate_sentence(self, text): 
         self.model.eval()
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
-        outputs = self.model.generate(**inputs, max_length=self.cfg.max_length, forced_bos_token_id=self.vi_token_id)
+        dtype_map = {
+            '16-mixed': torch.float16,
+            '32-true': torch.float32,
+            'bf16-mixed': torch.bfloat16
+        }
+        target_dtype = dtype_map.get(self.cfg.precision, torch.float16)
+        
+        with torch.autocast(device_type=self.device.type, dtype=target_dtype):
+            outputs = self.model.generate(**inputs, max_length=self.cfg.max_length, forced_bos_token_id=self.vi_token_id)
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
     
     def save_smart_checkpoint(self, save_dir, task_name):
