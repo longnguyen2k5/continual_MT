@@ -5,15 +5,15 @@ import math
 from core.base_lora import LoRABase
 
 class MoLEExpert(nn.Module): 
-    def __init__(self, r: int, lora_alpha: int, hidden_dim: int, init_strategy: str='kaiming'): 
+    def __init__(self, r: int, lora_alpha: int, in_features: int, out_features: int, init_strategy: str='kaiming'): 
         super().__init__()
         self.rank = r
         self.lora_alpha = lora_alpha
         self.scaling = lora_alpha / math.sqrt(r)
         self.init_strategy = init_strategy
         
-        self.A = nn.Parameter(torch.empty(r, hidden_dim))
-        self.B = nn.Parameter(torch.empty(hidden_dim, r))
+        self.A = nn.Parameter(torch.empty(r, in_features))
+        self.B = nn.Parameter(torch.empty(out_features, r))
         self.reset_parameters()
     
     def reset_parameters(self): 
@@ -95,7 +95,7 @@ class ContinualMoLELinear(nn.Module):
                                               out_features=self.base_layer.out_features, 
                                               num_experts=num_token_experts, 
                                               init_strategy=self.init_strategy)
-        self.shared_expert = MoLEExpert(r=r, lora_alpha=lora_alpha, hidden_dim=self.hidden_dim, init_strategy=self.init_strategy)
+        self.shared_expert = MoLEExpert(r=r, lora_alpha=lora_alpha, in_features=self.hidden_dim, out_features=self.base_layer.out_features, init_strategy=self.init_strategy)
         
         self.num_task = 0
         self.task_keys = nn.Parameter(torch.empty(0, self.hidden_dim), requires_grad=False)
@@ -129,7 +129,8 @@ class ContinualMoLELinear(nn.Module):
         
         self.task_experts.append(MoLEExpert(r=self.r, 
                                             lora_alpha=self.lora_alpha, 
-                                            hidden_dim=self.hidden_dim, 
+                                            in_features=self.hidden_dim, 
+                                            out_features=self.base_layer.out_features,
                                             init_strategy=self.init_strategy))
         self.num_task += 1
     
