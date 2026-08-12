@@ -192,9 +192,9 @@ class ContinualMoLELinear(nn.Module):
                 task_expert_outputs += delta_out
                 
         shared_expert_output = self.shared_expert(x) * theta_IE.to(x.device).view(-1, 1, 1)
-        
-        return base_out + token_expert_outputs + task_expert_outputs + shared_expert_output
-
+        final_out = base_out + token_expert_outputs + task_expert_outputs + shared_expert_output
+        return final_out.device(x.device)
+    
     def get_routing_loss(self, gamma: float=1.0, delta: float=1.0): 
         if self.old_token_router is None or self.old_task_keys is None: 
             return torch.tensor(0.0, device=self.current_x.device)
