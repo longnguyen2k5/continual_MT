@@ -30,7 +30,13 @@ def main(config_path, method=None, init_strategy=None):
         use_safetensors=True
     )
     model = NormalMTModel(config, tokenizer)
-    
+    # =========================================================
+    # 2. GỌI SANITY CHECK Ở ĐÂY (TRƯỚC KHI TRAIN)
+    # =========================================================
+    print("🛠️ Đang chạy kiểm thử kiến trúc Save/Load...")
+    run_sanity_check_save_load(model, test_method_name=raw_config.get('lora_method', 'mole'))
+    print("✅ Kiểm thử xong! Chuẩn bị bước vào quá trình Train thật...\n")
+    # =========================================================
     data_collator = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
         model=model.model,
@@ -116,5 +122,4 @@ if __name__ == "__main__":
     parser.add_argument("--init-strategy", type=str, default=None, choices=['pissa', 'kaiming', 'normal', 'svd'], 
                         help="Chiến lược khởi tạo trọng số (ghi đè file config)")
     args = parser.parse_args()
-    run_sanity_check_save_load(model, test_method_name="mole")
     main(args.config, method=args.method, init_strategy=args.init_strategy)
