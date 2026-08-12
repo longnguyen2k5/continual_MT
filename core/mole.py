@@ -193,7 +193,7 @@ class ContinualMoLELinear(nn.Module):
                 
         shared_expert_output = self.shared_expert(x) * theta_IE.to(x.device).view(-1, 1, 1)
         final_out = base_out + token_expert_outputs + task_expert_outputs + shared_expert_output
-        return final_out.device(x.device)
+        return final_out.to(dtype=x.dtype)
     
     def get_routing_loss(self, gamma: float=1.0, delta: float=1.0): 
         if self.old_token_router is None or self.old_task_keys is None: 
