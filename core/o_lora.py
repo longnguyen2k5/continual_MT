@@ -15,6 +15,34 @@ class ContinualLoRABase(LoRABase):
             torch.zeros(self.out_features, self.in_features),
             persistent=False)
     
+    def get_whitelist_keys(self) -> list: 
+        return [
+            'A_curr',
+            'B_curr',
+            'history_A',
+            'history_B',
+            'A_core',
+            'B_core',
+            'num_reset'
+        ]
+    
+    def prepare_for_loading(self, adapter_state: dict) -> None:
+        hist_A_keys = [k for k in adapter_state.keys() if "history_A" in k]
+        num_history = len(hist_A_keys)
+        
+        while len(self.history_A) < num_history:
+            idx = len(self.history_A)
+            shape_A = adapter_state[f"history_A.{idx}"].shape
+            shape_B = adapter_state[f"history_B.{idx}"].shape
+            self.history_A.append(nn.Parameter(torch.empty(shape_A), requires_grad=False))
+            self.history_B.append(nn.Parameter(torch.empty(shape_B), requires_grad=False))
+        
+        self.pre_load_undo()
+    
+    def post_loading_hook(self): 
+        self.rebuild_cache()
+        self.post_load_redo()
+        
     def rebuild_cache(self): 
         with torch.no_grad(): 
             self.cache_history_delta_w.zero_()

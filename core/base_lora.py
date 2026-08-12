@@ -2,8 +2,8 @@ import torch
 import math 
 import torch.nn as nn 
 import torch.nn.functional as F
-
-class LoRABase(nn.Module): 
+from base_adapter import ContinualAdapter
+class LoRABase(ContinualAdapter): 
     def __init__(self, base_layer: nn.Linear, r: int=16, lora_alpha: int=1, init_strategy: str= 'kaiming'): 
         super().__init__()
         self.in_features = base_layer.in_features
@@ -83,6 +83,15 @@ class StandardLoRALinear(LoRABase):
     def __init__(self, base_layer: nn.Linear, r: int=16, lora_alpha: int=1, init_strategy: str='kaiming'):
         super().__init__(base_layer, r=r, lora_alpha=lora_alpha, init_strategy=init_strategy)
     
+    def get_whitelist_keys(self) -> list:
+        return [
+            'A_curr',
+            'B_curr',
+            'A_core',
+            'B_core',
+            'num_reset'
+        ]
+
     def forward(self, x: torch.Tensor): 
         delta_w = self.compute_delta_w() # out_features * in_features
         w_active = self.weight + delta_w # out_features * in_features

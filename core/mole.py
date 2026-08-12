@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 import math 
-from core.base_lora import LoRABase
+from core.base_adapter import ContinualAdapter
 
 class MoLEExpert(nn.Module): 
     def __init__(self, r: int, lora_alpha: int, in_features: int, out_features: int, init_strategy: str='kaiming'): 
@@ -69,7 +69,7 @@ class MoLETokenRouter(nn.Module):
     def forward(self, x: torch.Tensor): 
         return self.w2(F.tanh(self.w1(x))) 
 
-class ContinualMoLELinear(nn.Module): 
+class ContinualMoLELinear(ContinualAdapter): 
     def __init__(self, base_layer: nn.Linear, 
                  r: int, 
                  lora_alpha: int, 
@@ -110,7 +110,37 @@ class ContinualMoLELinear(nn.Module):
         
         self.current_x = None
         self.current_router_logits = None
-        
+    
+    def get_whitelist_keys(self) -> list:
+        return [
+            'token_router',
+            'token_experts',
+            'shared_expert',
+            'task_keys',
+            'task_experts'
+        ]
+    
+    def prepare_for_loading(self, adapter_state: dict) -> None: 
+        if 'task_keys' in adapter_state:
+            num_saved_tasks = adapter_state['task_keys'].shape[0]
+            
+            while len(self.task_experts) < num_saved_tasks:
+                new_expert = MoLEExpert(
+                    r=self.r, 
+                    lora_alpha=self.lora_alpha, 
+                    in_features=self.hidden_dim, 
+                    out_features=self.base_layer.out_features,
+                    init_strategy=self.init_strategy
+                )
+                
+                # Ép kiểu cho an toàn
+                target_dtype = self.base_layer.weight.dtype
+                target_device = self.base_layer.weight.device
+                new_expert.to(dtype=target_dtype, device=target_device)
+                
+                self.task_experts.append(new_expert)
+                self.num_task += 1
+                
     def on_task_start(self): 
         if self.num_task == 0: 
             import copy 

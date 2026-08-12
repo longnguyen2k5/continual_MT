@@ -2,7 +2,8 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSe
 import torch
 import pytorch_lightning as pl
 from core import inject_lora
-from core.o_lora import get_total_orthogonal_loss, ContinualLoRABase
+from core.o_lora import get_total_orthogonal_loss
+from core.base_adapter import ContinualAdapter
 import os
 import sacrebleu
 import torch.nn as nn
@@ -239,51 +240,46 @@ class NormalMTModel(pl.LightningModule):
     
     def save_smart_checkpoint(self, save_dir, task_name):
         os.makedirs(save_dir, exist_ok=True)
-        full_state_dict = self.model.state_dict()
-        lora_keys = [
-            "A_curr", 
-            "B_curr", 
-            "A_core", 
-            "B_core",
-            "num_reset",
-            "history_A", 
-            "history_B", 
-        ]
-        lora_state_dict = {
-            k: v for k, v in full_state_dict.items() 
-            if any(lora_key in k for lora_key in lora_keys)
-        }
-        save_path = os.path.join(save_dir, f"checkpoint_{task_name}.pt")
-        torch.save(lora_state_dict, save_path)
-        print(f"💾 Đã lưu trọng số LoRA và Memory History của task '{task_name}' tại: {save_path}")
+        adapter_state_dict = {}
         
+        # 1. Quét toàn bộ model, tìm các Adapter (MoLE hoặc OLoRA đều được)
+        for name, module in self.model.named_modules(): 
+            if isinstance(module, ContinualAdapter):
+                # Bảo Adapter tự nôn dữ liệu của nó ra (dựa trên Whitelist của nó)
+                local_state = module.get_adapter_state() 
+                for k, v in local_state.items():
+                    adapter_state_dict[f"{name}.{k}"] = v
+                    
+        save_path = os.path.join(save_dir, f"checkpoint_{task_name}.pt")
+        torch.save(adapter_state_dict, save_path)
+        print(f"💾 Đã lưu Adapter State của task '{task_name}' tại: {save_path}")
+
     def load_smart_checkpoint(self, checkpoint_path): 
         if not os.path.exists(checkpoint_path):
             raise FileNotFoundError(f"⚠️ Không tìm thấy checkpoint tại: {checkpoint_path}")
         
-        lora_state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-        
+        adapter_state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
         count = 0
-        for name, module in self.model.named_modules(): 
-            if isinstance(module, ContinualLoRABase): 
-                hist_A_keys = [k for k in lora_state_dict.keys() if f"{name}.history_A" in k]
-                num_history = len(hist_A_keys)
-                
-                while len(module.history_A) < num_history: 
-                    idx = len(module.history_A)
-                    shape_A = lora_state_dict[f"{name}.history_A.{idx}"].shape
-                    shape_B = lora_state_dict[f"{name}.history_B.{idx}"].shape
-                    module.history_A.append(nn.Parameter(torch.empty(shape_A), requires_grad=False))
-                    module.history_B.append(nn.Parameter(torch.empty(shape_B), requires_grad=False))
-                
-                module.pre_load_undo()
-                count += 1
-                    
-        missing_keys, unexpected_keys = self.model.load_state_dict(lora_state_dict, strict=False)
         
-        for module in self.model.modules(): 
-            if isinstance(module, ContinualLoRABase): 
-                module.rebuild_cache()
-                module.post_load_redo()
+        # --- PHASE 1: CHUẨN BỊ BỘ NHỚ ---
+        for name, module in self.model.named_modules(): 
+            if isinstance(module, ContinualAdapter):
+                prefix = f"{name}."
+                # Cắt riêng phần dữ liệu thuộc về module này
+                local_state = {k[len(prefix):]: v for k, v in adapter_state_dict.items() if k.startswith(prefix)}
                 
-        print(f"✅ Đã nạp thành công Checkpoint và đồng bộ W_core cho {count} lớp!")
+                if local_state:
+                    # Truyền dữ liệu cho module để nó tự xây chỗ chứa (History hoặc Task Experts)
+                    module.prepare_for_loading(local_state)
+                    count += 1
+                    
+        # --- PHASE 2: BƠM DỮ LIỆU ---
+        missing_keys, unexpected_keys = self.model.load_state_dict(adapter_state_dict, strict=False)
+        
+        # --- PHASE 3: XỬ LÝ TOÁN HỌC SAU KHI NẠP ---
+        for module in self.model.modules(): 
+            if isinstance(module, ContinualAdapter):
+                # OLoRA sẽ rebuild_cache, còn MoLE sẽ không làm gì cả!
+                module.post_loading_hook()
+                
+        print(f"✅ Đã nạp thành công Checkpoint cho {count} lớp Adapter!")
