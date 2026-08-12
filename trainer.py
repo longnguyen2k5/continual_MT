@@ -115,4 +115,5 @@ if __name__ == "__main__":
     parser.add_argument("--init-strategy", type=str, default=None, choices=['pissa', 'kaiming', 'normal', 'svd'], 
                         help="Chiến lược khởi tạo trọng số (ghi đè file config)")
     args = parser.parse_args()
+    run_sanity_check_save_load(model, test_method_name="mole")
     main(args.config, method=args.method, init_strategy=args.init_strategy)
