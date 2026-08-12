@@ -2,7 +2,7 @@ import torch
 import math 
 import torch.nn as nn 
 import torch.nn.functional as F
-from base_adapter import ContinualAdapter
+from core.base_adapter import ContinualAdapter
 class LoRABase(ContinualAdapter): 
     def __init__(self, base_layer: nn.Linear, r: int=16, lora_alpha: int=1, init_strategy: str= 'kaiming'): 
         super().__init__()

@@ -10,6 +10,7 @@ import os
 import gc
 from utils.helpers import load_config
 from core.config import ExperimentConfig 
+from test_save_load import run_sanity_check_save_load
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
