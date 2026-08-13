@@ -28,8 +28,10 @@ class MoLEExpert(nn.Module):
     
     def forward(self, x: torch.Tensor): 
         # x: batch_size, seq_len, hidden_dim
-        x_A = F.linear(x, self.A) # batch_size, seq_len, r
-        out = F.linear(x_A, self.B) # batch_size, seq_len, hidden_dim
+        A_cast = self.A.to(dtype=x.dtype, device=x.device)
+        B_cast = self.B.to(dtype=x.dtype, device=x.device)
+        x_A = F.linear(x, A_cast) # batch_size, seq_len, r
+        out = F.linear(x_A, B_cast) # batch_size, seq_len, hidden_dim
         return out * self.scaling
 class MoLETokenExperts(nn.Module): 
     def __init__(self, r: int, lora_alpha: int, in_features: int, out_features: int, num_experts: int, init_strategy: str='kaiming'): 
@@ -54,8 +56,11 @@ class MoLETokenExperts(nn.Module):
         
     def forward(self, x: torch.Tensor, expert_mask: torch.Tensor): 
         # x: batch_size, seq_len, hidden_dim
-        x_A = torch.einsum('bsi, eir -> bser', x, self.A_stacked) # batch_size, seq_len, num_experts, r
-        x_AB = torch.einsum('bser, ero -> bseo', x_A, self.B_stacked) # batch_size, seq_len, num_experts, out_features
+        A_cast = self.A_stacked.to(dtype=x.dtype, device=x.device)
+        B_cast = self.B_stacked.to(dtype=x.dtype, device=x.device)
+        
+        x_A = torch.einsum('bsi, eir -> bser', x, A_cast) # batch_size, seq_len, num_experts, r
+        x_AB = torch.einsum('bser, ero -> bseo', x_A, B_cast) # batch_size, seq_len, num_experts, out_features
         
         out = torch.einsum('bseo, bse -> bso', x_AB, expert_mask) # batch_size, seq_len, out_features
         return out * self.scaling
@@ -67,7 +72,9 @@ class MoLETokenRouter(nn.Module):
         self.w2 = nn.Linear(num_experts, num_experts)
     
     def forward(self, x: torch.Tensor): 
-        return self.w2(F.tanh(self.w1(x))) 
+        W1_cast = self.w1.to(dtype=x.dtype, device=x.device)
+        W2_cast = self.w2.to(dtype=x.dtype, device=x.device)
+        return W2_cast(F.tanh(W1_cast(x))) 
 
 class ContinualMoLELinear(ContinualAdapter): 
     def __init__(self, base_layer: nn.Linear, 
@@ -176,10 +183,9 @@ class ContinualMoLELinear(ContinualAdapter):
         batch_size, seq_len, hidden_dim = x.shape 
         
         base_out = F.linear(x, self.base_layer.weight, getattr(self, 'bias', None)) 
-        x_f32 = x.to(dtype=torch.float32)
-        self.current_x = x_f32
+        self.current_x = x
         
-        router_logits = self.token_router(x_f32)
+        router_logits = self.token_router(x)
         self.current_router_logits = router_logits
         
         routing_probs = F.softmax(router_logits, dim=-1)
@@ -188,19 +194,19 @@ class ContinualMoLELinear(ContinualAdapter):
         
         top_k_probs = top_k_probs / top_k_probs.sum(dim=-1, keepdim=True)
         
-        expert_mask = torch.zeros_like(routing_probs).scatter_(-1, top_k_indices, top_k_probs)
+        expert_mask = torch.zeros_like(routing_probs, device=x.device, dtype=x.dtype).scatter_(-1, top_k_indices, top_k_probs)
         
-        token_expert_outputs = self.token_experts(x_f32, expert_mask)
+        token_expert_outputs = self.token_experts(x, expert_mask)
         
         if self.cache_best_task_idx is not None and self.cache_theta_t is not None and self.cache_theta_IE is not None:
-            theta_t = self.cache_theta_t.to(device=x.device, dtype=torch.float32)
-            theta_IE = self.cache_theta_IE.to(device=x.device, dtype=torch.float32)
+            theta_t = self.cache_theta_t.to(device=x.device, dtype=x.dtype)
+            theta_IE = self.cache_theta_IE.to(device=x.device, dtype=x.dtype)
             theta_t_indices = self.cache_best_task_idx.to(device=x.device)
         else: 
-            sentence_representation = x_f32.mean(dim=1) # batch_size, hidden_dim 
+            sentence_representation = x.mean(dim=1) # batch_size, hidden_dim 
             cos_sim = F.cosine_similarity(
                 sentence_representation.unsqueeze(1), # batch_size, 1, hidden_dim
-                self.task_keys.to(device=x.device, dtype=torch.float32).unsqueeze(0), # 1, num_task, hidden_dim
+                self.task_keys.to(device=x.device, dtype=x.dtype).unsqueeze(0), # 1, num_task, hidden_dim
                 dim=-1
             ) # batch_size, num_task
             
@@ -215,26 +221,23 @@ class ContinualMoLELinear(ContinualAdapter):
         curr_indices = theta_t_indices.to(x.device).unsqueeze(-1)
         curr_src = theta_t.to(x.device).unsqueeze(-1)
         
-        task_mask = torch.zeros(batch_size, self.num_task, device=x.device, dtype=torch.float32).scatter_(-1, curr_indices, curr_src)
+        task_mask = torch.zeros(batch_size, self.num_task, device=x.device, dtype=x.dtype).scatter_(-1, curr_indices, curr_src)
         
-        task_expert_outputs = torch.zeros_like(base_out, device=x.device, dtype=torch.float32)
+        task_expert_outputs = torch.zeros_like(base_out, device=x.device, dtype=x.dtype)
         
         for i, experts in enumerate(self.task_experts): 
             weight_t = task_mask[:, i].view(-1, 1, 1)
             if weight_t.sum() > 0: 
-                delta_out = experts(x_f32) * weight_t
+                delta_out = experts(x) * weight_t
                 task_expert_outputs += delta_out
                 
-        shared_expert_output = self.shared_expert(x_f32) * theta_IE.to(x.device).view(-1, 1, 1)
+        shared_expert_output = self.shared_expert(x) * theta_IE.to(x.device).view(-1, 1, 1)
         
-        mole_out_f32 = token_expert_outputs + task_expert_outputs + shared_expert_output
-        final_out = base_out + mole_out_f32.to(dtype=base_out.dtype)
-        
-        return final_out
+        return base_out + token_expert_outputs + task_expert_outputs + shared_expert_output        
     
     def get_routing_loss(self, gamma: float=1.0, delta: float=1.0): 
         if self.old_token_router is None or self.old_task_keys is None: 
-            return torch.tensor(0.0, device=self.current_x.device, dtype=torch.float32)
+            return torch.tensor(0.0, device=self.current_x.device, dtype=self.current_x.dtype)
         
         self.old_token_router.to(self.current_x.device)
         student_router_log_probs = F.log_softmax(self.current_router_logits, dim=-1)
@@ -248,7 +251,7 @@ class ContinualMoLELinear(ContinualAdapter):
         sentence_representation = self.current_x.mean(dim=1) # batch_size, hidden_dim
         
         old_num_task = self.old_task_keys.size(0)
-        student_task_keys_old = self.task_keys[:old_num_task].to(dtype=torch.float32) # old_num_task, hidden_dim
+        student_task_keys_old = self.task_keys[:old_num_task].to(dtype=self.current_x.dtype) # old_num_task, hidden_dim
         
         student_cos_sim = F.cosine_similarity(
             sentence_representation.unsqueeze(1), # batch_size, 1, hidden_dim 
@@ -260,7 +263,7 @@ class ContinualMoLELinear(ContinualAdapter):
         with torch.no_grad(): 
             teacher_cos_sim = F.cosine_similarity(
                 sentence_representation.unsqueeze(1), # batch_size, 1, hidden_dim 
-                self.old_task_keys.to(device=sentence_representation.device, dtype=torch.float32).unsqueeze(0), # 1, old_num_task, hidden_dim
+                self.old_task_keys.to(device=sentence_representation.device, dtype=self.current_x.dtype).unsqueeze(0), # 1, old_num_task, hidden_dim
                 dim=-1) # batch_size, old_num_task
             teacher_keys_probs = F.softmax(teacher_cos_sim, dim=-1)
         l_kkd = F.kl_div(student_keys_log_probs, teacher_keys_probs, reduction='batchmean')
@@ -286,4 +289,4 @@ def get_total_routing_loss(model: nn.Module, gamma: float=1.0, delta: float=1.0)
         return total_loss / num_mole_layers
     else: 
         device = next(model.parameters()).device
-        return torch.tensor(0.0, device=device)
+        return torch.tensor(0.0, device=device, dtype=torch.float32)
