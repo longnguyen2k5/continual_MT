@@ -27,12 +27,14 @@ class MoLEExpert(nn.Module):
             raise ValueError(f"Chiến lược khởi tạo '{self.init_strategy}' không hợp lệ. Vui lòng chọn từ ['kaiming', 'normal'].")
     
     def forward(self, x: torch.Tensor): 
-        device_type = 'cuda' if x.is_cuda else 'cpu'
-        # x: batch_size, seq_len, hidden_dim
-        with torch.autocast(device_type=device_type, dtype=x.dtype, enabled=x.dtype in [torch.float16, torch.bfloat16]):
-            x_A = F.linear(x, self.A) # batch_size, seq_len, r
-            out = F.linear(x_A, self.B) # batch_size, seq_len, hidden_dim
-            return out * self.scaling
+        # CỰC KỲ QUAN TRỌNG: Ép trọng số theo x.dtype ngay lập tức
+        A_weight = self.A.to(dtype=x.dtype)
+        B_weight = self.B.to(dtype=x.dtype)
+        
+        x_A = F.linear(x, A_weight) 
+        out = F.linear(x_A, B_weight) 
+        return out * self.scaling
+    
 class MoLETokenExperts(nn.Module): 
     def __init__(self, r: int, lora_alpha: int, in_features: int, out_features: int, num_experts: int, init_strategy: str='kaiming'): 
         super().__init__()
@@ -55,14 +57,15 @@ class MoLETokenExperts(nn.Module):
             raise ValueError(f"Chiến lược khởi tạo '{init_strategy}' không hợp lệ. Vui lòng chọn từ ['kaiming', 'normal'].")
         
     def forward(self, x: torch.Tensor, expert_mask: torch.Tensor): 
-        # x: batch_size, seq_len, hidden_dim
-        device_type = 'cuda' if x.is_cuda else 'cpu'
-        with torch.autocast(device_type=device_type, dtype=x.dtype, enabled=x.dtype in [torch.float16, torch.bfloat16]):
-            x_A = torch.einsum('bsi, eir -> bser', x, self.A_stacked) # batch_size, seq_len, num_experts, r
-            x_AB = torch.einsum('bser, ero -> bseo', x_A, self.B_stacked) # batch_size, seq_len, num_experts, out_features
-            
-            out = torch.einsum('bseo, bse -> bso', x_AB, expert_mask) # batch_size, seq_len, out_features
-            return out * self.scaling
+        # CỰC KỲ QUAN TRỌNG: Ép trọng số theo x.dtype ngay lập tức
+        A_weight = self.A_stacked.to(dtype=x.dtype)
+        B_weight = self.B_stacked.to(dtype=x.dtype)
+        
+        x_A = torch.einsum('bsi, eir -> bser', x, A_weight) 
+        x_AB = torch.einsum('bser, ero -> bseo', x_A, B_weight) 
+        
+        out = torch.einsum('bseo, bse -> bso', x_AB, expert_mask) 
+        return out * self.scaling
 
 class MoLETokenRouter(nn.Module): 
     def __init__(self, hidden_dim: int, num_experts: int): 
@@ -71,10 +74,11 @@ class MoLETokenRouter(nn.Module):
         self.w2 = nn.Linear(num_experts, num_experts)
     
     def forward(self, x: torch.Tensor): 
-        device_type = 'cuda' if x.is_cuda else 'cpu'
-        with torch.autocast(device_type=device_type, dtype=x.dtype, enabled=x.dtype in [torch.float16, torch.bfloat16]):
-            return self.w2(F.tanh(self.w1(x))) 
-
+        orig_dtype = x.dtype
+        x_in = x.to(dtype=self.w1.weight.dtype)
+        
+        out = self.w2(F.tanh(self.w1(x_in)))
+        return out.to(dtype=orig_dtype)
 class ContinualMoLELinear(ContinualAdapter): 
     def __init__(self, base_layer: nn.Linear, 
                  r: int, 
