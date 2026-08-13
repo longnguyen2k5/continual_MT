@@ -49,7 +49,7 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
     for task_idx, domain_name in enumerate(continual_task): 
         print(f"🚀 Bắt đầu huấn luyện cho domain: {domain_name}")
         
-        train_data_list = get_domain_data(domain_name, split_type='train', num_sample=config.num_sample)
+        train_data_list = get_domain_data(domain_name, split_type='train', num_sample=config.num_sample, max_length=config.max_length)
         train_dataset = ContinualTranslationDataset(train_data_list, tokenizer_name_or_path=config.model_name, max_length=config.max_length)
         
         train_dataloader = DataLoader(
@@ -68,7 +68,7 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
             precision=config.precision,  # '16-mixed' | '32-true' | 'bf16-mixed'
         )   
         
-        validate_datalist = get_domain_data(domain_name, split_type='validation', num_sample=config.num_sample)
+        validate_datalist = get_domain_data(domain_name, split_type='validation', num_sample=config.num_sample, max_length=config.max_length)
         validate_dataset = ContinualTranslationDataset(validate_datalist, 
                                                        tokenizer_name_or_path=config.model_name, 
                                                        max_length=config.max_length)

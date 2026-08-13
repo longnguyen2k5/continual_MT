@@ -60,7 +60,7 @@ def evaluate(config_path, checkpoint_path, method=None, init_strategy=None):
     domain_to_test = ['medical', 'news', 'general']
     
     for domain_name in domain_to_test:
-        test_data_list = get_domain_data(domain_name, split_type='test', num_sample=config.num_sample)
+        test_data_list = get_domain_data(domain_name, split_type='test', num_sample=config.num_test_sample, max_length=config.max_length)
         test_dataset = ContinualTranslationDataset(test_data_list, tokenizer_name_or_path=config.model_name, max_length=config.max_length)
         test_dataloader = DataLoader(
             test_dataset,

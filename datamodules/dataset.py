@@ -1,4 +1,5 @@
 import os
+import random
 import torch 
 from torch.utils.data import Dataset
 from datasets import load_dataset
@@ -8,8 +9,7 @@ from datasets import DatasetDict
 
 load_dotenv()  # Load biến môi trường từ file .env nếu có
 
-def get_domain_data(domain_name, split_type='train', num_sample=None, cache_dir='./data'):
-    
+def get_raw_domain_data(domain_name, split_type='train', cache_dir='./data'):
     if domain_name == 'medical': 
         dataset = load_dataset(
             "mteb/VieMedEVBitextMining", 
@@ -27,9 +27,6 @@ def get_domain_data(domain_name, split_type='train', num_sample=None, cache_dir=
             'test': test_val['test']
         })
         target_dataset = final_dataset[split_type]
-        
-        if num_sample:
-            target_dataset = target_dataset.select(range(min(num_sample, len(target_dataset))))
             
         return [{'en' : ex['sentence2'], 'vi': ex['sentence1']} for ex in target_dataset]
         
@@ -42,9 +39,6 @@ def get_domain_data(domain_name, split_type='train', num_sample=None, cache_dir=
             token=os.getenv("HF_TOKEN")
         )
         target_dataset = dataset[split_type] 
-        
-        if num_sample: 
-            target_dataset = target_dataset.shuffle(seed=42).select(range(min(num_sample, len(target_dataset))))
         return [{'en' : ex['translation']['en'], 'vi': ex['translation']['vi']} for ex in target_dataset]
     
     elif domain_name == 'general': 
@@ -55,14 +49,42 @@ def get_domain_data(domain_name, split_type='train', num_sample=None, cache_dir=
             token=os.getenv("HF_TOKEN")
         )
         target_dataset = dataset[split_type]
-        if num_sample: 
-            target_dataset = target_dataset.shuffle(seed=42).select(range(min(num_sample, len(target_dataset))))
-        
         return [{'en' : ex['en'], 'vi': ex['vi']} for ex in target_dataset]
     else: 
         raise ValueError(f"Domain '{domain_name}' không hợp lệ. Vui lòng chọn từ ['medical', 'it', 'general'].")
     
+def filter_and_valid_data(raw_data_list, max_length): 
+    clean_data = [] 
+    for item in raw_data_list: 
+        src_text = item['en']
+        tgt_text = item['vi']
+        
+        if not src_text or not tgt_text or str(src_text).strip() == "" or str(tgt_text).strip() == "":
+            continue
+        
+        if len(str(src_text).split()) > 0.8 * max_length or len(str(tgt_text).split()) > 0.8 * max_length:
+            continue
+        
+        clean_data.append(item)
+    return clean_data
+
+def sample_balanced_data(data_list, num_sample): 
+    total_clean = len(data_list)
+    random.seed(42)
     
+    if total_clean <= num_sample: 
+        return data_list
+    else: 
+        return random.sample(data_list, num_sample)
+
+def get_domain_data(domain_name, split_type='train', max_length=128, num_sample=1000, cache_dir='./data'):
+    raw_data = get_raw_domain_data(domain_name, split_type=split_type, cache_dir=cache_dir)
+    filtered_data = filter_and_valid_data(raw_data, max_length=max_length)
+    sampled_data = sample_balanced_data(filtered_data, num_sample=num_sample)
+    
+    return sampled_data
+        
+        
 class ContinualTranslationDataset(Dataset): 
     def __init__(self, data_list, tokenizer_name_or_path="facebook/nllb-200-distilled-600M", max_length=128): 
         self.data = data_list
@@ -90,9 +112,12 @@ class ContinualTranslationDataset(Dataset):
             truncation=True, 
             return_tensors='pt'
         )
+        input_ids = model_inputs['input_ids'].squeeze(0)
+        attention_mask = model_inputs['attention_mask'].squeeze(0)
+        labels = model_inputs['labels'].squeeze(0)
         
         return {
-            'input_ids': model_inputs['input_ids'].squeeze(0), 
-            'attention_mask': model_inputs['attention_mask'].squeeze(0), 
-            'labels': model_inputs['labels'].squeeze(0)
+            'input_ids': input_ids, 
+            'attention_mask': attention_mask, 
+            'labels': labels
         }
