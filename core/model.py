@@ -12,7 +12,7 @@ from core.mole import flush_mole_cache, get_total_routing_loss
 from core.config import ExperimentConfig
 
 class NormalMTModel(pl.LightningModule): 
-    def __init__(self, config: ExperimentConfig, tokenizer): 
+    def __init__(self, config: ExperimentConfig, tokenizer, apply_adapters: bool=True): 
         super().__init__()
         self.cfg = config
         self.tokenizer = tokenizer
@@ -20,11 +20,15 @@ class NormalMTModel(pl.LightningModule):
         self.num_task = 0
         self.vi_token_id = self.tokenizer.convert_tokens_to_ids('vie_Latn')
         base_model = self._build_base_model()
-        self.model = inject_lora(base_model, 
-                                 method=config.lora_method,
-                                 **asdict(self.cfg)
-                                )
-        
+        if apply_adapters:
+            self.model = inject_lora(base_model, 
+                                     method=config.lora_method,
+                                     **asdict(self.cfg)
+                                    )
+        else:
+            print("⚠️ Chế độ Zero-Shot Baseline: Bỏ qua bước Inject LoRA/MoLE.")
+            self.model = base_model
+
         self.print_trainable_parameters()
         
     def _build_base_model(self): 

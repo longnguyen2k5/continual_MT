@@ -1,4 +1,5 @@
-import argparse 
+import argparse
+import os 
 import torch 
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
@@ -24,13 +25,22 @@ def evaluate(config_path, checkpoint_path, method=None, init_strategy=None):
         use_safetensors=True
     )
     
-    model = NormalMTModel(config, tokenizer)
+    is_baseline = (checkpoint_path is None or checkpoint_path.lower() == 'none' or not os.path.exists(checkpoint_path))
+    model = NormalMTModel(config, tokenizer, apply_adapters=not is_baseline)
     
     if checkpoint_path is not None:
         model.load_smart_checkpoint(checkpoint_path)
         print(f"🎯 Đang đánh giá mô hình ĐÃ HUẤN LUYỆN (từ {checkpoint_path})")
     else:
         print("⚠️ KHÔNG CÓ CHECKPOINT! Đang đánh giá mô hình GỐC (Zero-shot Baseline)...")
+    
+    dtype_map = {
+        '16-mixed': torch.float16,
+        '32-true': torch.float32,
+        'bf16-mixed': torch.bfloat16
+    }
+    target_dtype = dtype_map.get(config.precision, torch.float16)
+    model.to(dtype=target_dtype)
     
     model.eval()
     data_collator = DataCollatorForSeq2Seq(
@@ -44,7 +54,7 @@ def evaluate(config_path, checkpoint_path, method=None, init_strategy=None):
         accelerator="auto",
         devices=1,
         logger=False,
-        precision='bf16-mixed'
+        precision=config.precision
     )
     
     domain_to_test = ['medical', 'news', 'general']
