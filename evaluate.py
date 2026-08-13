@@ -7,18 +7,20 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSe
 from utils.helpers import load_config
 from core.model import NormalMTModel
 from datamodules.dataset import ContinualTranslationDataset, get_domain_data
+from core.config import ExperimentConfig
 
 def evaluate(config_path, checkpoint_path, method=None, init_strategy=None): 
-    config = load_config(config_path)
     
-    if method is not None:
-        config['lora_method'] = method
+    raw_config = load_config(config_path)
+    if method is not None: 
+        raw_config['lora_method'] = method
     if init_strategy is not None:
-        config['init_strategy'] = init_strategy
+        raw_config['init_strategy'] = init_strategy
     
+    config = ExperimentConfig(**raw_config)
     tokenizer = AutoTokenizer.from_pretrained(
-        config['model_name'],
-        cache_dir=config['cache_dir'],
+        config.model_name,
+        cache_dir=config.cache_dir,
         use_safetensors=True
     )
     
@@ -48,11 +50,11 @@ def evaluate(config_path, checkpoint_path, method=None, init_strategy=None):
     domain_to_test = ['medical', 'news', 'general']
     
     for domain_name in domain_to_test:
-        test_data_list = get_domain_data(domain_name, split_type='test', num_sample=config.get("num_test_sample", None))
-        test_dataset = ContinualTranslationDataset(test_data_list, tokenizer_name_or_path=config['model_name'], max_length=config.get("max_length", 128))
+        test_data_list = get_domain_data(domain_name, split_type='test', num_sample=config.num_sample)
+        test_dataset = ContinualTranslationDataset(test_data_list, tokenizer_name_or_path=config.model_name, max_length=config.max_length)
         test_dataloader = DataLoader(
             test_dataset,
-            batch_size=config.get("batch_size", 4) * 2,
+            batch_size=config.batch_size * 2,
             shuffle=False,
             collate_fn=data_collator,
             num_workers=0
