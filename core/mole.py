@@ -124,6 +124,9 @@ class ContinualMoLELinear(ContinualAdapter):
         if 'task_keys' in adapter_state:
             num_saved_tasks = adapter_state['task_keys'].shape[0]
             
+            empty_keys = torch.empty(num_saved_tasks, self.hidden_dim, device=self.base_layer.weight.device, dtype=self.base_layer.weight.dtype)
+            self.task_keys = nn.Parameter(empty_keys, requires_grad=False)
+            
             while len(self.task_experts) < num_saved_tasks:
                 new_expert = MoLEExpert(
                     r=self.r, 
