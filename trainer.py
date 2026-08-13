@@ -14,7 +14,7 @@ from test_save_load import run_sanity_check_save_load
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-def main(config_path, method=None, init_strategy=None): 
+def main(config_path, method=None, init_strategy=None, run_sanity_check=False): 
     pl.seed_everything(42, workers=True)
     raw_config = load_config(config_path)
     if method is not None: 
@@ -33,9 +33,10 @@ def main(config_path, method=None, init_strategy=None):
     # =========================================================
     # 2. GỌI SANITY CHECK Ở ĐÂY (TRƯỚC KHI TRAIN)
     # =========================================================
-    print("🛠️ Đang chạy kiểm thử kiến trúc Save/Load...")
-    run_sanity_check_save_load(model, test_method_name=raw_config.get('lora_method', 'mole'))
-    print("✅ Kiểm thử xong! Chuẩn bị bước vào quá trình Train thật...\n")
+    if run_sanity_check:
+        print("🛠️ Đang chạy kiểm thử kiến trúc Save/Load...")
+        run_sanity_check_save_load(model, test_method_name=raw_config.get('lora_method', 'mole'))
+        print("✅ Kiểm thử xong! Chuẩn bị bước vào quá trình Train thật...\n")
     # =========================================================
     data_collator = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
@@ -121,5 +122,9 @@ if __name__ == "__main__":
                         help="Phương pháp muốn chạy (ghi đè file config)")
     parser.add_argument("--init-strategy", type=str, default=None, choices=['pissa', 'kaiming', 'normal', 'svd'], 
                         help="Chiến lược khởi tạo trọng số (ghi đè file config)")
+    
+    parser.add_argument("--sanity-check", action="store_true", 
+                        help="Bật cờ này để chạy Sanity Check trước khi huấn luyện (dùng cho debug)")
+    
     args = parser.parse_args()
-    main(args.config, method=args.method, init_strategy=args.init_strategy)
+    main(args.config, method=args.method, init_strategy=args.init_strategy, run_sanity_check=args.sanity_check)
