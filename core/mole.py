@@ -194,7 +194,7 @@ class ContinualMoLELinear(ContinualAdapter):
         
         top_k_probs = top_k_probs / top_k_probs.sum(dim=-1, keepdim=True)
         
-        expert_mask = torch.zeros_like(routing_probs, device=x.device, dtype=x.dtype).scatter_(-1, top_k_indices, top_k_probs.to(x.device))
+        expert_mask = torch.zeros_like(routing_probs, device=x.device, dtype=x.dtype).scatter_(-1, top_k_indices, top_k_probs.to(dtype=x.dtype))
         
         token_expert_outputs = self.token_experts(x, expert_mask)
         
@@ -221,7 +221,7 @@ class ContinualMoLELinear(ContinualAdapter):
         curr_indices = theta_t_indices.to(x.device).unsqueeze(-1)
         curr_src = theta_t.to(x.device).unsqueeze(-1)
         
-        task_mask = torch.zeros(batch_size, self.num_task, device=x.device, dtype=x.dtype).scatter_(-1, curr_indices, curr_src.to(x.device))
+        task_mask = torch.zeros(batch_size, self.num_task, device=x.device, dtype=x.dtype).scatter_(-1, curr_indices, curr_src.to(dtype=x.dtype))
         
         task_expert_outputs = torch.zeros_like(base_out, device=x.device, dtype=x.dtype)
         
