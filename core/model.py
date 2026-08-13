@@ -212,7 +212,7 @@ class NormalMTModel(pl.LightningModule):
     def translate_sentence(self, text): 
         self.model.eval()
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
-        outputs = self.model.generate(**inputs, max_length=self.max_length, forced_bos_token_id=self.vi_token_id)
+        outputs = self.model.generate(**inputs, max_length=self.cfg.max_length, forced_bos_token_id=self.vi_token_id)
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
     
     def save_smart_checkpoint(self, save_dir, task_name):
