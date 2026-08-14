@@ -52,9 +52,10 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
         train_data_list = get_domain_data(domain_name, split_type='train', num_sample=config.num_sample, max_length=config.max_length)
         train_dataset = ContinualTranslationDataset(train_data_list, tokenizer_name_or_path=config.model_name, max_length=config.max_length)
         
+        accumulate_steps = max(1, config.batch_size // config.micro_batch_size)
         train_dataloader = DataLoader(
             train_dataset, 
-            batch_size=config.batch_size, 
+            batch_size=config.micro_batch_size, 
             shuffle=True, 
             collate_fn=data_collator,
             num_workers=0
@@ -66,6 +67,7 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
             accelerator="gpu",
             devices=1,
             precision=config.precision,  # '16-mixed' | '32-true' | 'bf16-mixed'
+            accumulate_grad_batches=accumulate_steps,
         )   
         
         validate_datalist = get_domain_data(domain_name, split_type='validation', num_sample=config.num_sample, max_length=config.max_length)
@@ -74,7 +76,7 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
                                                        max_length=config.max_length)
         validate_dataloader = DataLoader(
             validate_dataset,
-            batch_size=config.batch_size,
+            batch_size=config.micro_batch_size,
             shuffle=False,
             collate_fn=data_collator,
             num_workers=0
@@ -82,6 +84,10 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
         
         model.current_task_name = domain_name
         model.on_task_start()
+        
+        torch.cuda.empty_cache()
+        gc.collect()
+        
         trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=validate_dataloader)
         
         if task_idx < len(continual_task) - 1:  # Nếu chưa phải là task cuối cùng
