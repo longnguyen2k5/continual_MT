@@ -1,6 +1,31 @@
 import os
 import torch
 
+def test_mole_cache_leak(model, tokenizer):
+    print("🔬 Đang kiểm tra nguy cơ rò rỉ Cache của MoLE (4 vs 2 bug)...")
+    
+    # 1. Tạo batch size 4 (Train) và batch size 2 (Eval)
+    inputs_4 = tokenizer(["Hello"] * 4, return_tensors="pt")
+    inputs_2 = tokenizer(["Hello"] * 2, return_tensors="pt")
+    
+    # 2. Ép chạy Train (size 4)
+    model.train()
+    _ = model.model(**inputs_4)
+    
+    # 3. Ép chạy Eval (size 2) -> Để mô hình nạp Cache size 2
+    model.eval()
+    with torch.no_grad():
+        _ = model.model.generate(**inputs_2, max_length=2)
+        
+    # 4. Ép chạy Train lại (size 4) -> Điểm tử huyệt!
+    model.train()
+    try:
+        _ = model.model(**inputs_4)
+        print("✅ PASSED: Mô hình đã chặn thành công rò rỉ Cache! Sẵn sàng Train.")
+    except Exception as e:
+        print("❌ FAILED: Phát hiện rò rỉ Cache! Hãy kiểm tra lại code MoLE forward().")
+        raise e # Dừng chương trình ngay lập tức
+    
 def run_sanity_check_save_load(model_wrapper, test_method_name="mole"):
     """
     Script kiểm tra tự động xem Save/Load có hoạt động 100% chính xác không.

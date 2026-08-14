@@ -150,7 +150,11 @@ class NormalMTModel(pl.LightningModule):
         self.val_preds = [] 
         self.val_refs = []
         self.val_srcs = [] 
-        
+    
+    def on_train_epoch_start(self):
+        # Chỉ chạy 1 lần duy nhất khi bắt đầu một Epoch Train mới (tiết kiệm CPU hơn)
+        if self.cfg.lora_method == 'mole':
+            flush_mole_cache(self.model)
     def on_validation_batch_start(self, batch, batch_idx, dataloader_idx=0):
         if self.cfg.lora_method == 'mole':
             flush_mole_cache(self.model)

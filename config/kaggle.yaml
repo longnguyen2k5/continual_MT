@@ -26,3 +26,4 @@ lora_method: 'olora' # olora | oliera | lora
 init_strategy: 'pissa' # kaiming | normal | svd | pissa
 checkpoint_path: './checkpoints'
 micro_batch_size: 4
+debug_mode: False

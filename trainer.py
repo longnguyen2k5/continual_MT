@@ -10,7 +10,7 @@ import os
 import gc
 from utils.helpers import load_config
 from core.config import ExperimentConfig 
-from test_save_load import run_sanity_check_save_load
+from test_save_load import run_sanity_check_save_load, test_mole_cache_leak
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -36,6 +36,7 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
     if run_sanity_check:
         print("🛠️ Đang chạy kiểm thử kiến trúc Save/Load...")
         run_sanity_check_save_load(model, test_method_name=raw_config.get('lora_method', 'mole'))
+        test_mole_cache_leak(model, tokenizer)
         print("✅ Kiểm thử xong! Chuẩn bị bước vào quá trình Train thật...\n")
     # =========================================================
     data_collator = DataCollatorForSeq2Seq(

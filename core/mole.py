@@ -3,7 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math 
 from core.base_adapter import ContinualAdapter
+import logging
 
+# Khởi tạo một logger riêng cho file này
+logger = logging.getLogger(__name__)
 class MoLEExpert(nn.Module): 
     def __init__(self, r: int, lora_alpha: int, in_features: int, out_features: int, init_strategy: str='kaiming'): 
         super().__init__()
@@ -85,13 +88,17 @@ class ContinualMoLELinear(ContinualAdapter):
                  lora_alpha: int, 
                  num_token_experts: int=4, 
                  top_k: int=2, 
-                 init_strategy: str='kaiming'):
+                 init_strategy: str='kaiming', 
+                 **kwargs):
         super().__init__()
         self.base_layer = base_layer
         self.hidden_dim = base_layer.in_features
         self.top_k = top_k
         self.init_strategy = init_strategy
-        
+        self.debug_mode = kwargs.get('debug_mode', False)
+        if self.debug_mode: 
+            logger.setLevel(logging.DEBUG)
+            logger.debug("Debug mode is enabled for ContinualMoLELinear.")
         self.r = r 
         self.lora_alpha = lora_alpha
         self.base_layer.requires_grad = False
@@ -188,24 +195,31 @@ class ContinualMoLELinear(ContinualAdapter):
         base_out = F.linear(x, self.base_layer.weight, getattr(self, 'bias', None)) 
         self.current_x = x
         
+        # --- 1. TOKEN ROUTER (Không bị ảnh hưởng bởi lỗi Cache) ---
         router_logits = self.token_router(x)
         self.current_router_logits = router_logits
-        
         routing_probs = F.softmax(router_logits, dim=-1)
-        
         top_k_probs, top_k_indices = torch.topk(routing_probs, self.top_k, dim=-1)
-        
         top_k_probs = top_k_probs / top_k_probs.sum(dim=-1, keepdim=True)
-        
         expert_mask = torch.zeros_like(routing_probs, device=x.device, dtype=x.dtype).scatter_(-1, top_k_indices, top_k_probs.to(dtype=x.dtype))
-        
         token_expert_outputs = self.token_experts(x, expert_mask)
         
-        if self.cache_best_task_idx is not None and self.cache_theta_t is not None and self.cache_theta_IE is not None:
+        # --- 2. TASK ROUTER & CACHE LOGIC TỐI THƯỢNG ---
+        
+        # Điều kiện dùng Cache:
+        # CHỈ ĐƯỢC DÙNG KHI: 1. Đang không phải Train, 2. Đang sinh từ (seq_len == 1), 3. Cache có tồn tại
+        use_cache = (not self.training) and (seq_len == 1) and \
+                    (self.cache_best_task_idx is not None and self.cache_theta_t is not None and self.cache_theta_IE is not None)
+        
+        if use_cache:
+            if self.debug_mode:
+                logger.debug(f"🟢 [CACHE] Generate. Batch={batch_size}, Seq={seq_len}")
+            # Lấy từ Cache để chạy siêu tốc lúc Generate
             theta_t = self.cache_theta_t.to(device=x.device, dtype=x.dtype)
             theta_IE = self.cache_theta_IE.to(device=x.device, dtype=x.dtype)
             theta_t_indices = self.cache_best_task_idx.to(device=x.device)
         else: 
+            # Đang Train, HOẶC đang tính Encoder (seq_len > 1), HOẶC chưa có Cache
             sentence_representation = x.mean(dim=1) # batch_size, hidden_dim 
             cos_sim = F.cosine_similarity(
                 sentence_representation.unsqueeze(1), # batch_size, 1, hidden_dim
@@ -217,10 +231,22 @@ class ContinualMoLELinear(ContinualAdapter):
             theta_t, theta_t_indices = torch.max(task_scores, dim=-1) # batch_size
             theta_IE = 1 - theta_t # batch_size 
             
-            self.cache_best_task_idx = theta_t_indices.to(x.device)
-            self.cache_theta_t = theta_t.to(x.device)
-            self.cache_theta_IE = theta_IE.to(x.device)
-        
+            # LƯU CACHE (CHỈ LƯU NẾU ĐANG TEST/GENERATE VÀ BƯỚC ĐẦU TIÊN)
+            if (not self.training) and (seq_len > 1):
+                if self.debug_mode:
+                    logger.debug(f"🟡 [ROUTER] Eval/Encoder (Tạo Cache). Batch={batch_size}, Seq={seq_len}")
+                self.cache_best_task_idx = theta_t_indices.to(x.device)
+                self.cache_theta_t = theta_t.to(x.device)
+                self.cache_theta_IE = theta_IE.to(x.device)
+            elif self.training:
+                if self.debug_mode:
+                    logger.debug(f"🔴 [ROUTER] Train (XÓA CACHE). Batch={batch_size}, Seq={seq_len}")
+                # Đang train thì XÓA TRẮNG CACHE để tuyệt đối an toàn
+                self.cache_best_task_idx = None
+                self.cache_theta_t = None
+                self.cache_theta_IE = None
+
+        # --- 3. APPLY TASK EXPERTS ---
         curr_indices = theta_t_indices.to(x.device).unsqueeze(-1)
         curr_src = theta_t.to(x.device).unsqueeze(-1)
         
@@ -230,13 +256,15 @@ class ContinualMoLELinear(ContinualAdapter):
         
         for i, experts in enumerate(self.task_experts): 
             weight_t = task_mask[:, i].view(-1, 1, 1)
-            if weight_t.sum() > 0: 
+            # Thresholding Optimization
+            if weight_t.max().item() > 0.01: 
                 delta_out = experts(x) * weight_t
                 task_expert_outputs += delta_out
                 
+        # --- 4. APPLY SHARED EXPERT ---
         shared_expert_output = self.shared_expert(x) * theta_IE.to(x.device).view(-1, 1, 1)
         
-        return base_out + token_expert_outputs + task_expert_outputs + shared_expert_output        
+        return base_out + token_expert_outputs + task_expert_outputs + shared_expert_output     
     
     def get_routing_loss(self, gamma: float=1.0, delta: float=1.0): 
         if self.old_token_router is None or self.old_task_keys is None: 
