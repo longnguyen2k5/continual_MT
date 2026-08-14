@@ -1,30 +1,42 @@
 import os
 import torch
-
 def test_mole_cache_leak(model, tokenizer):
     print("🔬 Đang kiểm tra nguy cơ rò rỉ Cache của MoLE (4 vs 2 bug)...")
     
-    # 1. Tạo batch size 4 (Train) và batch size 2 (Eval)
-    inputs_4 = tokenizer(["Hello"] * 4, return_tensors="pt")
-    inputs_2 = tokenizer(["Hello"] * 2, return_tensors="pt")
+    # 1. Tạo batch size 4 (Train) CÓ KÈM text_target (labels)
+    inputs_4 = tokenizer(
+        text=["Hello"] * 4, 
+        text_target=["Xin chào"] * 4, # THÊM DÒNG NÀY ĐỂ MODEL KHÔNG BỊ BỐI RỐI LÚC TRAIN
+        return_tensors="pt"
+    ).to(model.device) # Nhớ push data lên GPU
     
-    # 2. Ép chạy Train (size 4)
+    # 2. Tạo batch size 2 (Eval) 
+    inputs_2 = tokenizer(
+        text=["Hello"] * 2, 
+        return_tensors="pt"
+    ).to(model.device)
+    
+    # Ép `model.model` thay vì `model` vì `model` là LightningModule, nó cần batch dictionary
+    # Ở đây ta gọi trực tiếp base model nên truyền như vầy là đúng.
+
+    # 3. Ép chạy Train (size 4)
     model.train()
     _ = model.model(**inputs_4)
     
-    # 3. Ép chạy Eval (size 2) -> Để mô hình nạp Cache size 2
+    # 4. Ép chạy Eval (size 2)
     model.eval()
     with torch.no_grad():
-        _ = model.model.generate(**inputs_2, max_length=2)
+        # Thêm kwargs cần thiết để generate chạy mượt
+        _ = model.model.generate(**inputs_2, max_length=2, forced_bos_token_id=model.vi_token_id)
         
-    # 4. Ép chạy Train lại (size 4) -> Điểm tử huyệt!
+    # 5. Ép chạy Train lại (size 4)
     model.train()
     try:
         _ = model.model(**inputs_4)
         print("✅ PASSED: Mô hình đã chặn thành công rò rỉ Cache! Sẵn sàng Train.")
     except Exception as e:
         print("❌ FAILED: Phát hiện rò rỉ Cache! Hãy kiểm tra lại code MoLE forward().")
-        raise e # Dừng chương trình ngay lập tức
+        raise e
     
 def run_sanity_check_save_load(model_wrapper, test_method_name="mole"):
     """
