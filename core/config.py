@@ -13,7 +13,7 @@ class ExperimentConfig:
     num_sample: int 
     num_test_sample: int 
     micro_batch_size: int = 4
-    
+    debug_mode: bool = False
     # LoRA config
     lora_method: str = 'olora'  # Options: 'lora', 'olora', 'oliera', 'mole'
     r: int = 16
