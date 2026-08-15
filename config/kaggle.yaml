@@ -16,9 +16,9 @@ delta: 1.0                        # Trọng số L_kkd (mole)
 target_modules: 
   - "q_proj"
   - "v_proj"
-  - "fc1"              # THÊM: Mở khóa lớp Fully Connected 1
-  - "fc2"              # THÊM: Mở khóa lớp Fully Connected 2
-  - "out_proj"         # THÊM: Mở khóa lớp Output Projection
+  # - "fc1"              # THÊM: Mở khóa lớp Fully Connected 1
+  # - "fc2"              # THÊM: Mở khóa lớp Fully Connected 2
+  # - "out_proj"         # THÊM: Mở khóa lớp Output Projection
 max_length: 128
 lora_alpha: 4
 precision: '16-mixed' # '16-mixed' | '32-true' | 'bf16-mixed' 
