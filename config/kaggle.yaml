@@ -8,7 +8,7 @@ fast_dev_run: False    # Tắt chế độ test, train thật sự!
 max_epochs: 10         # Train nhiều epoch
 num_sample: 1000              # Lấy mẫu 1000 câu để test, không train hết dataset
 num_test_sample: 200
-orthogonal_loss_weight: 0.05      # Dùng cho olora
+orthogonal_loss_weight: 1.0      # Dùng cho olora
 num_token_experts: 4               # Dùng cho mole
 top_k: 2                          # Dùng cho mole
 gamma: 1.0                        # Trọng số L_rkd (mole)
