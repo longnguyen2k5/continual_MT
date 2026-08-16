@@ -72,18 +72,20 @@ class ContinualLoRABase(LoRABase):
         if self.init_strategy == 'pissa':
             A_curr = torch.concat([self.A_curr, self.A_core], dim=0) # (r + r_core) * in_features
             B_curr = torch.concat([self.B_curr, -self.B_core], dim=1) # out_features * (r + r_core)
-        else:
-            A_curr = self.A_curr # r * in_features
-            B_curr = self.B_curr # out_features * r
-        
-        for A_old, B_old in zip(self.history_A, self.history_B):
-            # shape : B out_features * r_old, A r_old * in_features
-            
-            B_term = torch.mm(B_old.t(), B_curr) # r_old * (r + r_core)
-            A_term = torch.mm(A_curr, A_old.t()) # (r + r_core) * r_old
-            
-            frobenius_inner = torch.trace(torch.mm(B_term, A_term))
-            loss += torch.square(frobenius_inner)
+            for A_old, B_old in zip(self.history_A, self.history_B):
+                # shape : B out_features * r_old, A r_old * in_features
+                
+                B_term = torch.mm(B_old.t(), B_curr) # r_old * (r + r_core)
+                A_term = torch.mm(A_curr, A_old.t()) # (r + r_core) * r_old
+                
+                frobenius_inner = torch.trace(torch.mm(B_term, A_term))
+                loss += torch.square(frobenius_inner)
+        else: 
+            for A_old, B_old in zip(self.history_A, self.history_B):
+                A_term = torch.mm(self.A_curr, A_old.t()) # r * r_old
+                B_term = torch.mm(B_old.t(), self.B_curr) # r_old * r
+
+                loss += torch.mean(torch.square(A_term)) + torch.mean(torch.square(B_term))
         loss = loss / num_tasks
         return loss
     
