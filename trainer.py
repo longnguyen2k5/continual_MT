@@ -132,4 +132,4 @@ if __name__ == "__main__":
                         help="Bật cờ này để chạy Sanity Check trước khi huấn luyện (dùng cho debug)")
     
     args = parser.parse_args()
-    main(args.config, method=args.method, init_strategy=args.init_strategy, run_sanity_check=args.sanity_check)
+    main(args.config,run_sanity_check=args.sanity_check)
