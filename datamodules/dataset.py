@@ -1,8 +1,8 @@
 import os
 import random
 import torch 
-from torch.utils.data import Dataset
-from datasets import load_dataset
+from torch.utils.data import Dataset, DataLoader
+from datasets import load_dataset, Dataset as HFDataset
 from dotenv import load_dotenv
 from transformers import AutoTokenizer
 from datasets import DatasetDict
@@ -83,8 +83,33 @@ def get_domain_data(domain_name, split_type='train', max_length=128, num_sample=
     sampled_data = sample_balanced_data(filtered_data, num_sample=num_sample)
     
     return sampled_data
-        
-        
+
+def get_tokenized_dataset(domain_name, tokenizer, 
+                          split_type='train', 
+                          max_length=128, 
+                          num_sample=1000, 
+                          cache_dir='./data'): 
+    raw_data_list = get_domain_data(domain_name, split_type=split_type, max_length=max_length, num_sample=num_sample, cache_dir=cache_dir)
+    
+    hf_dataset = HFDataset.from_list(raw_data_list)
+    def tokenization_function(examples):
+        return tokenizer(
+                text=examples['en'],
+                text_target=examples['vi'],
+                max_length=max_length, 
+                truncation=True, 
+                return_tensors='pt'
+            )
+    print(f"Đang Tokenize dữ liệu cho domain: {domain_name}...")    
+    tokenized_dataset = hf_dataset.map(
+        tokenization_function, 
+        batched=True, 
+        remove_columns=['en', 'vi']
+    )
+    
+    tokenized_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
+    return tokenized_dataset
+    
 class ContinualTranslationDataset(Dataset): 
     def __init__(self, data_list, tokenizer_name_or_path="facebook/nllb-200-distilled-600M", max_length=128): 
         self.data = data_list

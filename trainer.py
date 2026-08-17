@@ -4,7 +4,7 @@ import torch
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq
-from datamodules.dataset import ContinualTranslationDataset, get_domain_data
+from datamodules.dataset import get_tokenized_dataset
 from core.model import NormalMTModel
 import os 
 import gc
@@ -50,16 +50,19 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
     for task_idx, domain_name in enumerate(continual_task): 
         print(f"🚀 Bắt đầu huấn luyện cho domain: {domain_name}")
         
-        train_data_list = get_domain_data(domain_name, split_type='train', num_sample=config.num_sample, max_length=config.max_length)
-        train_dataset = ContinualTranslationDataset(train_data_list, tokenizer_name_or_path=config.model_name, max_length=config.max_length)
-        
+        train_dataset = get_tokenized_dataset(domain_name, tokenizer, 
+                                              split_type='train', 
+                                              max_length=config.max_length, 
+                                              num_sample=config.num_sample, 
+                                              cache_dir='./data')
         accumulate_steps = max(1, config.batch_size // config.micro_batch_size)
         train_dataloader = DataLoader(
             train_dataset, 
             batch_size=config.micro_batch_size, 
             shuffle=True, 
             collate_fn=data_collator,
-            num_workers=0
+            num_workers=0,
+            pin_memory=True # Nên có để transfer từ RAM sang VRAM nhanh hơn
         )
         
         trainer = pl.Trainer(
@@ -71,16 +74,18 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
             accumulate_grad_batches=accumulate_steps,
         )   
         
-        validate_datalist = get_domain_data(domain_name, split_type='validation', num_sample=config.num_sample, max_length=config.max_length)
-        validate_dataset = ContinualTranslationDataset(validate_datalist, 
-                                                       tokenizer_name_or_path=config.model_name, 
-                                                       max_length=config.max_length)
+        validate_dataset = get_tokenized_dataset(domain_name, tokenizer, 
+                                                 split_type='validation', 
+                                                 max_length=config.max_length, 
+                                                 num_sample=config.num_sample, 
+                                                 cache_dir='./data')
         validate_dataloader = DataLoader(
             validate_dataset,
             batch_size=config.micro_batch_size,
             shuffle=False,
             collate_fn=data_collator,
-            num_workers=0
+            num_workers=0, 
+            pin_memory=True # Nên có để transfer từ RAM sang VRAM nhanh hơn
         )
         
         model.current_task_name = domain_name
