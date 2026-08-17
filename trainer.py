@@ -74,19 +74,19 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
             accumulate_grad_batches=accumulate_steps,
         )   
         
-        validate_dataset = get_tokenized_dataset(domain_name, tokenizer, 
-                                                 split_type='validation', 
-                                                 max_length=config.max_length, 
-                                                 num_sample=config.num_sample, 
-                                                 cache_dir='./data')
-        validate_dataloader = DataLoader(
-            validate_dataset,
-            batch_size=config.micro_batch_size,
-            shuffle=False,
-            collate_fn=data_collator,
-            num_workers=0, 
-            pin_memory=True # Nên có để transfer từ RAM sang VRAM nhanh hơn
-        )
+        # validate_dataset = get_tokenized_dataset(domain_name, tokenizer, 
+        #                                          split_type='validation', 
+        #                                          max_length=config.max_length, 
+        #                                          num_sample=config.num_sample, 
+        #                                          cache_dir='./data')
+        # validate_dataloader = DataLoader(
+        #     validate_dataset,
+        #     batch_size=config.micro_batch_size,
+        #     shuffle=False,
+        #     collate_fn=data_collator,
+        #     num_workers=0, 
+        #     pin_memory=True # Nên có để transfer từ RAM sang VRAM nhanh hơn
+        # )
         
         model.current_task_name = domain_name
         model.on_task_start()
@@ -94,7 +94,10 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
         torch.cuda.empty_cache()
         gc.collect()
         
-        trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=validate_dataloader)
+        trainer.fit(model, 
+                    train_dataloaders=train_dataloader, 
+                    # val_dataloaders=validate_dataloader
+                    )
         
         if task_idx < len(continual_task) - 1:  # Nếu chưa phải là task cuối cùng
             model.on_task_end()
