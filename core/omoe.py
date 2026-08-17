@@ -35,7 +35,9 @@ class OMoELinear(ContinualAdapter):
         batch_size, seq_len, _ = x.shape
         base_out = F.linear(x, self.weight, self.bias) 
         
-        experts_mask = torch.softmax(self.router(x), dim=-1, dtype=torch.float32).to(x.dtype) # shape: (batch_size, seq_len, num_experts)
+        router_weight = self.router.weight.to(x.dtype)
+        logits = F.linear(x, router_weight)
+        experts_mask = torch.softmax(logits, dim=-1, dtype=torch.float32).to(x.dtype) # shape: (batch_size, seq_len, num_experts)
         experts_output = self.lora_experts(x) # shape: (batch_size, seq_len, num_experts, out_features)
         
         E_matrix = experts_output.transpose(-1, -2)
