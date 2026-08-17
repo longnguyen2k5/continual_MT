@@ -23,13 +23,16 @@ class StackedLoRAExperts(nn.Module):
         else: 
             raise ValueError(f"Chiến lược khởi tạo '{init_strategy}' không hợp lệ. Vui lòng chọn từ ['kaiming', 'normal'].")
         
-    def forward(self, x: torch.Tensor, expert_mask: torch.Tensor): 
+    def forward(self, x: torch.Tensor, expert_mask: torch.Tensor=None): 
         # CỰC KỲ QUAN TRỌNG: Ép trọng số theo x.dtype ngay lập tức
         A_weight = self.A_stacked.to(dtype=x.dtype)
         B_weight = self.B_stacked.to(dtype=x.dtype)
         
         x_A = torch.einsum('bsi, eir -> bser', x, A_weight) 
         x_AB = torch.einsum('bser, ero -> bseo', x_A, B_weight) 
-        
-        out = torch.einsum('bseo, bse -> bso', x_AB, expert_mask) 
+        if expert_mask is not None:
+            out = torch.einsum('bseo, bse -> bso', x_AB, expert_mask) 
+        else: 
+            # Else for the OMoE Case, we return the output for all experts without applying the mask
+            out = x_AB # shape: (batch_size, seq_len, num_experts, out_features)
         return out * self.scaling

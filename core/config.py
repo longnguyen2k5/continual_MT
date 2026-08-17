@@ -27,8 +27,11 @@ class ExperimentConfig:
     gamma: float = 1.0
     delta: float = 1.0 
     
+    # OMoE config
+    num_omoe_experts: int = 2
+    
     # Orthogonal loss weight for LoRA methods
-    orthogonal_loss_weight: float = 0.05
+    orthogonal_loss_weight: float = 1.0
     
     # Optional
     fast_dev_run: bool = False

@@ -1,6 +1,7 @@
 from .base_lora import StandardLoRALinear
 from .o_lora import OLoRALinear, OLieRaLinear
 from .mole import ContinualMoLELinear
+from .omoe import OMoELinear
 import torch.nn as nn
 import inspect
 
@@ -8,7 +9,8 @@ LORA_MAPPING = {
     'lora': StandardLoRALinear, 
     'olora': OLoRALinear, 
     'oliera': OLieRaLinear, 
-    'mole': ContinualMoLELinear
+    'mole': ContinualMoLELinear,
+    'omoe': OMoELinear
 }
 def inject_lora(model: nn.Module, 
                 method: str = 'oliera', 

@@ -11,6 +11,7 @@ num_test_sample: 2
 orthogonal_loss_weight: 1.0      # Dùng cho olora
 num_token_experts: 4               # Dùng cho mole
 top_k: 2                          # Dùng cho mole
+num_omoe_experts: 2               # Dùng cho omoe
 gamma: 1.0                        # Trọng số L_rkd (mole)
 delta: 1.0                        # Trọng số L_kkd (mole)
 target_modules: 
