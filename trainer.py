@@ -102,8 +102,8 @@ def main(config_path, run_sanity_check=False):
         
         del train_dataloader 
         del train_dataset
-        del validate_dataloader
-        del validate_dataset
+        # del validate_dataloader
+        # del validate_dataset
         del trainer
         gc.collect()
         
