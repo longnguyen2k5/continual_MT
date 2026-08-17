@@ -97,8 +97,7 @@ def get_tokenized_dataset(domain_name, tokenizer,
                 text=examples['en'],
                 text_target=examples['vi'],
                 max_length=max_length, 
-                truncation=True, 
-                return_tensors='pt'
+                truncation=True
             )
     print(f"Đang Tokenize dữ liệu cho domain: {domain_name}...")    
     tokenized_dataset = hf_dataset.map(
