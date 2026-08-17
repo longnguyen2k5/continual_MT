@@ -14,14 +14,9 @@ from test_save_load import run_sanity_check_save_load, test_mole_cache_leak
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-def main(config_path, method=None, init_strategy=None, run_sanity_check=False): 
+def main(config_path, run_sanity_check=False): 
     pl.seed_everything(42, workers=True)
     raw_config = load_config(config_path)
-    if method is not None: 
-        raw_config['lora_method'] = method
-    if init_strategy is not None:
-        raw_config['init_strategy'] = init_strategy
-    
     config = ExperimentConfig(**raw_config)
     
     tokenizer = AutoTokenizer.from_pretrained(
@@ -133,11 +128,6 @@ def main(config_path, method=None, init_strategy=None, run_sanity_check=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Continual Machine Translation")
     parser.add_argument("--config", type=str, default="configs/local.yaml", help="Đường dẫn file config")
-    parser.add_argument("--method", type=str, default=None, choices=['lora', 'olora', 'oliera'], 
-                        help="Phương pháp muốn chạy (ghi đè file config)")
-    parser.add_argument("--init-strategy", type=str, default=None, choices=['pissa', 'kaiming', 'normal', 'svd'], 
-                        help="Chiến lược khởi tạo trọng số (ghi đè file config)")
-    
     parser.add_argument("--sanity-check", action="store_true", 
                         help="Bật cờ này để chạy Sanity Check trước khi huấn luyện (dùng cho debug)")
     
