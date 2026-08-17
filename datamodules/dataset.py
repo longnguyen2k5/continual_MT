@@ -106,7 +106,7 @@ def get_tokenized_dataset(domain_name, tokenizer,
         remove_columns=['en', 'vi']
     )
     
-    tokenized_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
+    # tokenized_dataset.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
     return tokenized_dataset
     
 class ContinualTranslationDataset(Dataset): 
