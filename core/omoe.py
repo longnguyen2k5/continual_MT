@@ -47,3 +47,5 @@ class OMoELinear(ContinualAdapter):
         moe_out = torch.einsum('bseo, bse -> bso', orthogonalized_output, experts_mask) # shape: (batch_size, seq_len, out_features)
         
         return base_out + moe_out
+
+    

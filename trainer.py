@@ -56,8 +56,7 @@ def main(config_path, run_sanity_check=False):
             batch_size=config.micro_batch_size, 
             shuffle=True, 
             collate_fn=data_collator,
-            num_workers=0,
-            pin_memory=True # Nên có để transfer từ RAM sang VRAM nhanh hơn
+            num_workers=0
         )
         
         trainer = pl.Trainer(

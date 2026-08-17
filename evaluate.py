@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSe
 
 from utils.helpers import load_config
 from core.model import NormalMTModel
-from datamodules.dataset import ContinualTranslationDataset, get_domain_data
+from datamodules.dataset import get_tokenized_dataset
 from core.config import ExperimentConfig
 
 def evaluate(config_path, checkpoint_path, method=None, init_strategy=None): 
@@ -60,8 +60,12 @@ def evaluate(config_path, checkpoint_path, method=None, init_strategy=None):
     domain_to_test = ['medical', 'news', 'general']
     
     for domain_name in domain_to_test:
-        test_data_list = get_domain_data(domain_name, split_type='test', num_sample=config.num_test_sample, max_length=config.max_length)
-        test_dataset = ContinualTranslationDataset(test_data_list, tokenizer_name_or_path=config.model_name, max_length=config.max_length)
+        test_dataset = get_tokenized_dataset(domain_name, tokenizer,
+                                              split_type='test', 
+                                              max_length=config.max_length, 
+                                              num_sample=config.num_test_sample, 
+                                              cache_dir='./data')
+        
         test_dataloader = DataLoader(
             test_dataset,
             batch_size=config.batch_size * 2,
