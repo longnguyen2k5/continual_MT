@@ -31,7 +31,7 @@ class ExperimentConfig:
     num_omoe_experts: int = 2
     
     # Orthogonal loss weight for LoRA methods
-    orthogonal_loss_weight: float = 1.0
+    orthogonal_loss_weight: float = 0.5
     
     # Optional
     fast_dev_run: bool = False

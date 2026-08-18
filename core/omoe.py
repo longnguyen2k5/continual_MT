@@ -31,6 +31,15 @@ class OMoELinear(ContinualAdapter):
         
         self.router = nn.Linear(self.in_features, self.num_experts)
     
+    def get_whitelist_keys(self):
+        return [
+            'num_reset', 
+            'lora_experts',
+            'router'
+        ]
+    
+    
+    
     def forward(self, x: torch.Tensor): 
         batch_size, seq_len, _ = x.shape
         base_out = F.linear(x, self.weight, self.bias) 
